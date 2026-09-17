@@ -396,6 +396,7 @@ function renderNav(){
 function goStep(n){
   if(n<1||n>TOTAL)return;
   currentModule='distribute';
+  if($("tplbar")) $("tplbar").style.display = "flex";
   S.step=n;
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("show",+p.dataset.step===n));
   $("crumb").textContent=`STEP ${n} / ${TOTAL}`;$("title").textContent=STEPS[n-1].t;

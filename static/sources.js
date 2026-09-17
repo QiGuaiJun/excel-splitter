@@ -48,6 +48,9 @@
     document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
     if(mod === "sources") $("navSources")?.classList.add("active");
     if(mod === "distribute") $("navDistribute")?.classList.add("active");
+    // 配置模板栏仅分发模块显示
+    const tplbar = $("tplbar");
+    if(tplbar) tplbar.style.display = (mod === "distribute") ? "flex" : "none";
   };
   window.goSources = function(){ goModule("sources"); };
 
