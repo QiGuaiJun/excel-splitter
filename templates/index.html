@@ -946,6 +946,29 @@ renderNav();goStep(1);
     <div class="modal-head"><h3>分类管理</h3><span class="close" onclick="hideModal('catModal')">×</span></div>
     <div class="modal-body">
       <div class="cat-list" id="catList"></div>
+
+<!-- 改分类弹窗 -->
+<div class="modal-mask" id="changeCatModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head"><h3>修改分类</h3><span class="close" onclick="hideModal('changeCatModal')">×</span></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px">当前数据源</div>
+        <div id="changeCatSrcName" style="font-size:14px;color:var(--sub);padding:8px 12px;background:#f5f8f7;border-radius:8px"></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px">选择分类</div>
+        <select id="changeCatSelect" style="width:100%;padding:10px 12px;border:1px solid #cfdcd9;border-radius:9px;font-size:14px;font-family:inherit;background:#fff">
+          <option value="">未分类</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="hideModal('changeCatModal')">取消</button>
+      <button class="btn btn-primary" onclick="SRC_confirmChangeCategory()">确认修改</button>
+    </div>
+  </div>
+</div>
       <div class="cat-add-row">
         <input type="text" id="newCatName" placeholder="输入新分类名称..." onkeydown="if(event.key==='Enter')SRC_addCat()">
         <button class="btn btn-primary" onclick="SRC_addCat()">添加</button>

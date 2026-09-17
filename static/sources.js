@@ -203,6 +203,14 @@
     crawler:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="#fdecec" stroke="#c0392b" stroke-width="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" stroke="#c0392b" stroke-width="1.5" stroke-linecap="round"/></svg>',
   };
 
+  function fmtTime(s){
+    if(!s) return "-";
+    const d = new Date(s);
+    if(isNaN(d.getTime())) return s;
+    const pad = n=>String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function renderSources(){
     const el = $("srcList");
     if(!el) return;
@@ -223,7 +231,7 @@
         <div class="sc-meta">
           <span>行数 <b>${ds.row_count||0}</b></span>
           <span>列数 <b>${ds.col_count||0}</b></span>
-          <span>分类 <b>${esc(ds.category_name||"未分类")}</b></span>
+          <span>更新 <b>${fmtTime(ds.updated_at)}</b></span>
           <span class="status-tag ${ds.status}">${ds.status==='ready'?'已就绪':ds.status==='pending'?'待采集':'异常'}</span>
         </div>
         ${sheets?`<div class="sc-sheets">${sheets}${more}</div>`:""}
@@ -445,26 +453,38 @@
   };
 
   /* ---------- 修改数据源分类 ---------- */
-  window.SRC_changeCategory = async function(id){
+  window.SRC_changeCategory = function(id){
     const ds = SRC.sources.find(s=>s.id===id);
     if(!ds) return;
-    const catNames = SRC.categories.map(c=>c.name).join("、");
-    const input = prompt(`输入要移动到的分类名称（当前：${ds.category_name||"未分类"}）\n可选分类：${catNames}\n留空=设为未分类`, ds.category_name||"");
-    if(input === null) return;
-    let newCatId = null;
-    if(input.trim()){
-      const cat = SRC.categories.find(c=>c.name===input.trim());
-      if(!cat){ toast("分类不存在，请先在「管理分类」中创建", "err"); return; }
-      newCatId = cat.id;
-    }
+    SRC._changeCatId = id;
+    // 设置数据源名称
+    $("changeCatSrcName").textContent = ds.name;
+    // 填充分类下拉框
+    const sel = $("changeCatSelect");
+    sel.innerHTML = `<option value="">未分类</option>` + SRC.categories.map(c=>
+      `<option value="${c.id}" ${c.id===ds.category_id?'selected':''}>${esc(c.name)}</option>`
+    ).join("");
+    showModal("changeCatModal");
+  };
+
+  window.SRC_confirmChangeCategory = async function(){
+    const id = SRC._changeCatId;
+    if(!id) return;
+    const val = $("changeCatSelect").value;
+    const newCatId = val ? parseInt(val) : null;
     try{
       const r = await fetch(`/api/sources/${id}`, {
         method:"PUT", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({category_id: newCatId})
       });
       const j = await r.json();
-      if(j.ok){ toast("分类已更新", "ok"); loadSources(); }
-      else toast(j.msg||"更新失败", "err");
+      if(j.ok){
+        toast("分类已更新", "ok");
+        hideModal("changeCatModal");
+        loadSources();
+      } else {
+        toast(j.msg||"更新失败", "err");
+      }
     }catch(e){ toast("网络错误", "err"); }
   };
 
