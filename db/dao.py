@@ -95,11 +95,14 @@ class DataSourceDAO(BaseDAO):
     """数据源 DAO。"""
 
     @staticmethod
-    def list_all(category_id=None, keyword=None):
-        """获取数据源列表，支持按分类筛选和关键词搜索（名称模糊匹配）。"""
+    def list_all(category_id=None, keyword=None, filter_null=False):
+        """获取数据源列表，支持按分类筛选和关键词搜索（名称模糊匹配）。
+        filter_null=True 时筛选 category_id IS NULL（未分类）。"""
         sql = "SELECT ds.*, c.name AS category_name FROM data_sources ds LEFT JOIN categories c ON ds.category_id = c.id WHERE 1=1"
         params = []
-        if category_id is not None:
+        if filter_null:
+            sql += " AND ds.category_id IS NULL"
+        elif category_id is not None:
             sql += " AND ds.category_id = %s"
             params.append(category_id)
         if keyword:

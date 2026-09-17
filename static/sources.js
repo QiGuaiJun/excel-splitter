@@ -86,7 +86,10 @@
 
   async function loadSources(){
     const params = new URLSearchParams();
-    if(SRC.curCat) params.set("category_id", SRC.curCat);
+    if(SRC.view === "detail"){
+      if(SRC.curCat) params.set("category_id", SRC.curCat);
+      else params.set("category_id", "none");
+    }
     if(SRC.keyword) params.set("keyword", SRC.keyword);
     try{
       const r = await fetch("/api/sources?" + params.toString());

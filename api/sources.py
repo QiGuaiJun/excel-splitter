@@ -69,10 +69,20 @@ def delete_category(cid):
 # ----------------------------------------------------------------------------
 @bp.route("/sources", methods=["GET"])
 def list_sources():
-    """获取数据源列表，支持 category_id 筛选和 keyword 搜索。"""
-    category_id = request.args.get("category_id", type=int)
+    """获取数据源列表，支持 category_id 筛选和 keyword 搜索。
+    category_id=none 表示筛选未分类（category_id IS NULL）。"""
+    cat_param = request.args.get("category_id", type=str)
     keyword = request.args.get("keyword", "").strip() or None
-    sources = DataSourceDAO.list_all(category_id=category_id, keyword=keyword)
+    filter_null = False
+    category_id = None
+    if cat_param == "none":
+        filter_null = True
+    elif cat_param is not None:
+        try:
+            category_id = int(cat_param)
+        except ValueError:
+            category_id = None
+    sources = DataSourceDAO.list_all(category_id=category_id, keyword=keyword, filter_null=filter_null)
     return jsonify({
         "ok": True,
         "data": sources,
