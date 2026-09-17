@@ -13,9 +13,14 @@ _*/
 *.log
 test_sum*.xlsx
 test_sum_out*/
+prototypes/
 _*.xlsx
 test_dirty.xlsx
 test_normal.xlsx
+
+# ---- 本地配置与数据（含数据库连接/源文件，禁止入库）----
+config/database.json
+data/
 
 # ---- 系统 / 编辑器 ----
 Thumbs.db
