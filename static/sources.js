@@ -10,6 +10,7 @@
     curCat: null,
     keyword: "",
     addChannel: "excel",
+    view: "overview",
   };
 
   const $ = id => document.getElementById(id);
@@ -96,7 +97,8 @@
       }
     }catch(e){ console.error("加载数据源失败", e); }
     renderStats();
-    renderSources();
+    if(SRC.view === "overview"){ renderCategoryOverview(); }
+    else { renderSources(); updateDetailHeader(); }
   }
 
   /* ---------- 渲染统计 ---------- */
@@ -110,6 +112,74 @@
       <div class="src-stat err"><div class="num">${SRC.stats.error||0}</div><div class="lab">异常</div></div>
     `;
   }
+
+  /* ---------- 第一层：分类汇总 ---------- */
+  function renderCategoryOverview(){
+    const el = $("catGrid");
+    if(!el) return;
+    const catMap = {};
+    SRC.sources.forEach(ds=>{
+      const cid = ds.category_id || "none";
+      if(!catMap[cid]) catMap[cid] = {name: ds.category_name || "未分类", total:0, ready:0, pending:0, error:0};
+      catMap[cid].total++;
+      if(catMap[cid][ds.status] !== undefined) catMap[cid][ds.status]++;
+    });
+    SRC.categories.forEach(c=>{
+      if(!catMap[c.id]) catMap[c.id] = {name: c.name, total:0, ready:0, pending:0, error:0};
+    });
+    if(!catMap["none"]) catMap["none"] = {name: "未分类", total:0, ready:0, pending:0, error:0};
+    const cats = Object.entries(catMap).map(([id, data])=>({id, ...data}));
+    if(!cats.length){
+      el.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="big">📂</div>暂无分类，点击「管理分类」创建</div>`;
+      return;
+    }
+    el.innerHTML = cats.map(c=>`
+      <div class="cat-card" onclick="SRC_goCategory('${c.id}')">
+        <div class="cc-head">
+          <div class="cc-icon">📁</div>
+          <div class="cc-name">${esc(c.name)}</div>
+          <span class="cc-count">${c.total} 个</span>
+        </div>
+        <div class="cc-stats">
+          <div class="cc-stat ready"><div class="n">${c.ready||0}</div><div class="l">已就绪</div></div>
+          <div class="cc-stat pending"><div class="n">${c.pending||0}</div><div class="l">待采集</div></div>
+          <div class="cc-stat error"><div class="n">${c.error||0}</div><div class="l">异常</div></div>
+        </div>
+        <div class="cc-arrow">→</div>
+      </div>`).join("");
+  }
+
+  function updateDetailHeader(){
+    const nameEl = $("catDetailName"), countEl = $("catDetailCount");
+    if(!nameEl) return;
+    let catName = "未分类";
+    if(SRC.curCat){
+      const cat = SRC.categories.find(c=>c.id===SRC.curCat);
+      if(cat) catName = cat.name;
+    }
+    nameEl.textContent = catName;
+    if(countEl) countEl.textContent = `${SRC.sources.length} 个数据源`;
+  }
+
+  window.SRC_goCategory = function(catId){
+    SRC.view = "detail";
+    SRC.curCat = (catId === "none" || catId === "") ? null : parseInt(catId);
+    SRC.keyword = "";
+    const si = $("srcSearchDetail");
+    if(si) si.value = "";
+    $("catOverview").style.display = "none";
+    $("catDetail").style.display = "block";
+    loadSources();
+  };
+
+  window.SRC_backToOverview = function(){
+    SRC.view = "overview";
+    SRC.curCat = null;
+    SRC.keyword = "";
+    $("catOverview").style.display = "block";
+    $("catDetail").style.display = "none";
+    loadSources();
+  };
 
   /* ---------- 渲染分类标签 ---------- */
   function renderCats(){
@@ -159,6 +229,7 @@
         ${sheets?`<div class="sc-sheets">${sheets}${more}</div>`:""}
         <div class="sc-actions" onclick="event.stopPropagation()">
           <button class="btn btn-ghost" onclick="SRC_preview(${ds.id})">预览</button>
+          <button class="btn btn-ghost cat-btn" onclick="SRC_changeCategory(${ds.id})">改分类</button>
           <button class="btn btn-ghost" onclick="SRC_recollect(${ds.id})">重新采集</button>
           <button class="btn btn-ghost" onclick="SRC_delete(${ds.id})" style="color:#e03131">删除</button>
         </div>
@@ -168,18 +239,21 @@
 
   /* ---------- 新增数据源 ---------- */
   window.SRC_toggleAddMenu = function(){
-    const m = $("addMenu");
+    const menuId = SRC.view === "detail" ? "addMenuDetail" : "addMenu";
+    const m = $(menuId);
     if(m) m.style.display = m.style.display==="none" ? "block" : "none";
   };
   document.addEventListener("click", e=>{
-    if(!e.target.closest("#addMenu") && !e.target.closest("[onclick*='SRC_toggleAddMenu']")){
-      const m = $("addMenu"); if(m) m.style.display="none";
+    if(!e.target.closest("#addMenu") && !e.target.closest("#addMenuDetail") && !e.target.closest("[onclick*='SRC_toggleAddMenu']")){
+      const m1=$("addMenu"); if(m1) m1.style.display="none";
+      const m2=$("addMenuDetail"); if(m2) m2.style.display="none";
     }
   });
 
   window.SRC_openAdd = function(channel){
     SRC.addChannel = channel;
-    $("addMenu").style.display = "none";
+    const m1=$("addMenu"); if(m1) m1.style.display="none";
+    const m2=$("addMenuDetail"); if(m2) m2.style.display="none";
     // 渲染通道选择
     const channels = [
       {k:"excel", label:"Excel 文件", desc:"上传 .xlsx/.csv 自动解析", icon:"📊"},
@@ -194,6 +268,9 @@
         <div class="cd">${c.desc}</div>
       </div>`).join("");
     SRC_renderAddForm();
+    if(SRC.view === "detail" && SRC.curCat){
+      setTimeout(()=>{ const sel=document.getElementById("addCat"); if(sel) sel.value=SRC.curCat; }, 0);
+    }
     showModal("addModal");
   };
 
@@ -367,6 +444,30 @@
     }catch(e){ toast("网络错误", "err"); }
   };
 
+  /* ---------- 修改数据源分类 ---------- */
+  window.SRC_changeCategory = async function(id){
+    const ds = SRC.sources.find(s=>s.id===id);
+    if(!ds) return;
+    const catNames = SRC.categories.map(c=>c.name).join("、");
+    const input = prompt(`输入要移动到的分类名称（当前：${ds.category_name||"未分类"}）\n可选分类：${catNames}\n留空=设为未分类`, ds.category_name||"");
+    if(input === null) return;
+    let newCatId = null;
+    if(input.trim()){
+      const cat = SRC.categories.find(c=>c.name===input.trim());
+      if(!cat){ toast("分类不存在，请先在「管理分类」中创建", "err"); return; }
+      newCatId = cat.id;
+    }
+    try{
+      const r = await fetch(`/api/sources/${id}`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({category_id: newCatId})
+      });
+      const j = await r.json();
+      if(j.ok){ toast("分类已更新", "ok"); loadSources(); }
+      else toast(j.msg||"更新失败", "err");
+    }catch(e){ toast("网络错误", "err"); }
+  };
+
   /* ---------- 分类管理 ---------- */
   window.SRC_openCatManager = function(){
     SRC_renderCatList();
@@ -503,16 +604,58 @@
   };
 
   /* ---------- 初始化 ---------- */
+  function initDragDrop(){
+    const wrap = $("srcPanelWrap");
+    if(!wrap) return;
+    let dragCounter = 0;
+    wrap.addEventListener("dragenter", e=>{
+      e.preventDefault();
+      dragCounter++;
+      $("dropMask")?.classList.add("show");
+    });
+    wrap.addEventListener("dragover", e=>{ e.preventDefault(); });
+    wrap.addEventListener("dragleave", e=>{
+      e.preventDefault();
+      dragCounter--;
+      if(dragCounter<=0){ $("dropMask")?.classList.remove("show"); dragCounter=0; }
+    });
+    wrap.addEventListener("drop", e=>{
+      e.preventDefault();
+      dragCounter = 0;
+      $("dropMask")?.classList.remove("show");
+      const files = e.dataTransfer.files;
+      if(files && files.length>0){
+        const file = files[0];
+        const ext = file.name.split(".").pop().toLowerCase();
+        if(["xlsx","xls","csv"].includes(ext)){
+          SRC_openAdd("excel");
+          setTimeout(()=>{
+            const fi = $("excelFile");
+            if(fi){
+              try{
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fi.files = dt.files;
+                $("excelFileName").textContent = file.name;
+              }catch(e){ toast("请手动选择文件", "err"); }
+            }
+          }, 100);
+        } else {
+          toast("仅支持 .xlsx / .xls / .csv 文件", "err");
+        }
+      }
+    });
+  }
+
   function init(){
-    // 点击 step 导航时移除模块入口高亮
     const nav = $("nav");
     if(nav){
       nav.addEventListener("click", e=>{
         if(e.target.closest(".step")) $("navSources")?.classList.remove("active");
       });
     }
-    // 弹窗遮罩点击关闭
     document.querySelectorAll(".modal-mask").forEach(m=>m.addEventListener("click", closeModalOnMask));
+    initDragDrop();
   }
 
   if(document.readyState === "loading"){

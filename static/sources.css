@@ -146,3 +146,43 @@
 .sub-step .dot{width:17px;height:17px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex:none;color:#cfe3de}
 .sub-step.active .dot{background:var(--primary);color:#fff}
 .sub-step .t{flex:1}
+
+/* ============================================================
+   层级视图：第一层分类汇总 + 第二层分类详情
+   ============================================================ */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.cat-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.cat-card:hover{border-color:var(--primary);transform:translateY(-2px)}
+.cat-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary);opacity:0;transition:.15s}
+.cat-card:hover::before{opacity:1}
+.cat-card .cc-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.cat-card .cc-icon{width:42px;height:42px;border-radius:11px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+.cat-card .cc-name{font-weight:700;font-size:15px;flex:1;word-break:break-all}
+.cat-card .cc-count{font-size:11px;background:#eef2f1;color:var(--sub);padding:3px 9px;border-radius:6px;font-weight:600}
+.cat-card .cc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cat-card .cc-stat{text-align:center;padding:8px 4px;background:#fafcfc;border-radius:8px}
+.cat-card .cc-stat .n{font-size:18px;font-weight:800;color:var(--ink)}
+.cat-card .cc-stat .l{font-size:10.5px;color:var(--faint);margin-top:2px}
+.cat-card .cc-stat.ready .n{color:#15a34a}
+.cat-card .cc-stat.pending .n{color:#b07a1a}
+.cat-card .cc-stat.error .n{color:#e03131}
+.cat-card .cc-arrow{position:absolute;right:16px;bottom:14px;color:var(--faint);font-size:16px;opacity:0;transition:.15s}
+.cat-card:hover .cc-arrow{opacity:1;transform:translateX(3px)}
+
+.detail-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.detail-header .back-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);transition:.12s;font-family:inherit}
+.detail-header .back-btn:hover{border-color:var(--primary);color:var(--primary-d)}
+.detail-header h3{font-size:18px;font-weight:700;flex:1}
+.detail-header .count{font-size:12px;color:var(--faint);background:#eef2f1;padding:4px 10px;border-radius:6px;font-weight:600}
+
+/* 拖拽上传遮罩 */
+.src-panel-wrap{position:relative}
+.drop-mask{position:absolute;inset:0;background:rgba(15,157,143,.06);border:3px dashed var(--primary);border-radius:16px;display:none;align-items:center;justify-content:center;z-index:50;pointer-events:none}
+.drop-mask.show{display:flex}
+.drop-mask .dm-box{background:#fff;padding:30px 50px;border-radius:16px;box-shadow:0 20px 50px rgba(13,52,47,.2);text-align:center}
+.drop-mask .dm-icon{font-size:42px;margin-bottom:10px}
+.drop-mask .dm-text{font-size:16px;font-weight:700;color:var(--primary-d)}
+.drop-mask .dm-sub{font-size:12px;color:var(--faint);margin-top:4px}
+
+/* 数据源卡片上的修改分类按钮 */
+.src-card .sc-actions .btn.cat-btn{color:var(--primary-d)}

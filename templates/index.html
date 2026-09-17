@@ -192,27 +192,60 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
 
     <div class="stage">
       <section class="panel" data-module="sources">
-        <div class="src-stats" id="srcStats"></div>
-        <div class="src-cats" id="srcCats"></div>
-        <div class="src-tools">
-          <div class="search-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#5d726d" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="#5d726d" stroke-width="2" stroke-linecap="round"/></svg>
-            <input type="text" id="srcSearch" placeholder="搜索数据源名称..." oninput="SRC_search(this.value)">
-          </div>
-          <button class="btn btn-ghost" onclick="SRC_openCatManager()">管理分类</button>
-          <div class="spacer"></div>
-          <div style="position:relative">
-            <button class="btn btn-primary" onclick="SRC_toggleAddMenu()">+ 新增数据源</button>
-            <div class="add-menu" id="addMenu" style="display:none">
-              <div onclick="SRC_openAdd('excel')">📊 Excel 文件上传</div>
+        <div class="src-panel-wrap" id="srcPanelWrap">
+          <!-- 第一层：分类汇总 -->
+          <div id="catOverview">
+            <div class="src-stats" id="srcStats"></div>
+            <div class="src-tools">
+              <button class="btn btn-ghost" onclick="SRC_openCatManager()">管理分类</button>
+              <div class="spacer"></div>
+              <div style="position:relative">
+                <button class="btn btn-primary" onclick="SRC_toggleAddMenu()">+ 新增数据源</button>
+                <div class="add-menu" id="addMenu" style="display:none">
+                  <div onclick="SRC_openAdd('excel')">📊 Excel 文件上传</div>
               <div onclick="SRC_openAdd('folder')">📁 文件夹批量导入</div>
               <div class="disabled">🗄️ 数据库连接（待接入）</div>
               <div class="disabled">🕷️ 代码爬取（待接入）</div>
+                </div>
+              </div>
+            </div>
+            <div class="cat-grid" id="catGrid"></div>
+          </div>
+          <!-- 第二层：分类详情 -->
+          <div id="catDetail" style="display:none">
+            <div class="detail-header">
+              <button class="back-btn" onclick="SRC_backToOverview()">← 返回分类</button>
+              <h3 id="catDetailName"></h3>
+              <span class="count" id="catDetailCount"></span>
+            </div>
+            <div class="src-tools">
+              <div class="search-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#5d726d" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="#5d726d" stroke-width="2" stroke-linecap="round"/></svg>
+                <input type="text" id="srcSearchDetail" placeholder="搜索数据源名称..." oninput="SRC_search(this.value)">
+              </div>
+              <div class="spacer"></div>
+              <div style="position:relative">
+                <button class="btn btn-primary" onclick="SRC_toggleAddMenu()">+ 新增数据源</button>
+                <div class="add-menu" id="addMenuDetail" style="display:none">
+                  <div onclick="SRC_openAdd('excel')">📊 Excel 文件上传</div>
+              <div onclick="SRC_openAdd('folder')">📁 文件夹批量导入</div>
+              <div class="disabled">🗄️ 数据库连接（待接入）</div>
+              <div class="disabled">🕷️ 代码爬取（待接入）</div>
+                </div>
+              </div>
+            </div>
+            <div class="src-list" id="srcList">
+              <div class="empty-state">加载中...</div>
             </div>
           </div>
-        </div>
-        <div class="src-list" id="srcList">
-          <div class="empty-state">加载中...</div>
+          <!-- 拖拽上传遮罩 -->
+          <div class="drop-mask" id="dropMask">
+            <div class="dm-box">
+              <div class="dm-icon">📥</div>
+              <div class="dm-text">松开以上传文件</div>
+              <div class="dm-sub">支持 .xlsx / .xls / .csv</div>
+            </div>
+          </div>
         </div>
       </section>
       <!-- 1 文件+子表 -->
