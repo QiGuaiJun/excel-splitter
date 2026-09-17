@@ -28,7 +28,7 @@ client = app.test_client()
 P = "t_api_"
 
 # 清理旧测试数据
-for ds in DataSourceDAO.list_all():
+for ds in DataSourceDAO.list_all()[0]:
     if ds["name"].startswith(P):
         DataSourceDAO.delete(ds["id"])
 for c in CategoryDAO.list_all():

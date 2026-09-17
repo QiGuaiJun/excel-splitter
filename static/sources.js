@@ -11,6 +11,9 @@
     keyword: "",
     addChannel: "excel",
     view: "overview",
+    page: 1,
+    pageSize: 20,
+    pagination: null,
   };
 
   const $ = id => document.getElementById(id);
@@ -89,6 +92,8 @@
     if(SRC.view === "detail"){
       if(SRC.curCat) params.set("category_id", SRC.curCat);
       else params.set("category_id", "none");
+      params.set("page", SRC.page);
+      params.set("page_size", SRC.pageSize);
     }
     if(SRC.keyword) params.set("keyword", SRC.keyword);
     try{
@@ -97,11 +102,12 @@
       if(j.ok){
         SRC.sources = j.data;
         SRC.stats = j.stats || SRC.stats;
+        SRC.pagination = j.pagination || null;
       }
     }catch(e){ console.error("加载数据源失败", e); }
     renderStats();
     if(SRC.view === "overview"){ renderCategoryOverview(); }
-    else { renderSources(); updateDetailHeader(); }
+    else { renderSources(); updateDetailHeader(); renderPagination(); }
   }
 
   /* ---------- 渲染统计 ---------- */
@@ -168,6 +174,7 @@
     SRC.view = "detail";
     SRC.curCat = (catId === "none" || catId === "") ? null : parseInt(catId);
     SRC.keyword = "";
+    SRC.page = 1;
     const si = $("srcSearchDetail");
     if(si) si.value = "";
     $("catOverview").style.display = "none";
@@ -179,6 +186,7 @@
     SRC.view = "overview";
     SRC.curCat = null;
     SRC.keyword = "";
+    SRC.page = 1;
     $("catOverview").style.display = "block";
     $("catDetail").style.display = "none";
     loadSources();
@@ -195,7 +203,7 @@
     el.innerHTML = html;
   }
   window.SRC_setCat = function(id){ SRC.curCat = id; renderCats(); loadSources(); };
-  window.SRC_search = function(v){ SRC.keyword = v; clearTimeout(SRC._st); SRC._st=setTimeout(loadSources, 250); };
+  window.SRC_search = function(v){ SRC.keyword = v; SRC.page = 1; clearTimeout(SRC._st); SRC._st=setTimeout(loadSources, 250); };
 
   /* ---------- 渲染数据源卡片 ---------- */
   const CHANNEL_LABEL = {excel:"Excel", folder:"文件夹", database:"数据库", crawler:"爬虫"};
@@ -219,6 +227,13 @@
     if(!el) return;
     if(!SRC.sources.length){
       el.innerHTML = `<div class="empty-state"><div class="big">📂</div>暂无数据源，点击右上角「新增数据源」开始采集</div>`;
+      return;
+    }
+    if(!SRC.sources.length){
+      el.innerHTML = `<div class="empty-state"><div class="big">📂</div>暂无数据源，点击右上角「新增数据源」开始采集</div>`;
+      // 移除旧的分页控件
+      const oldPg = document.getElementById("srcPagination");
+      if(oldPg) oldPg.remove();
       return;
     }
     el.innerHTML = SRC.sources.map(ds=>{
@@ -246,7 +261,46 @@
         </div>
       </div>`;
     }).join("");
+    // 渲染分页控件
+    renderPagination();
   }
+
+  function renderPagination(){
+    // 移除旧的
+    const oldPg = document.getElementById("srcPagination");
+    if(oldPg) oldPg.remove();
+    if(!SRC.pagination || SRC.pagination.total_pages <= 1) return;
+    const pg = SRC.pagination;
+    const el = $("srcList");
+    if(!el) return;
+    const pgDiv = document.createElement("div");
+    pgDiv.id = "srcPagination";
+    pgDiv.className = "src-pagination";
+    pgDiv.innerHTML = `
+      <div class="pg-info">共 ${pg.total} 条，第 ${pg.page}/${pg.total_pages} 页</div>
+      <div class="pg-controls">
+        <select class="pg-size" onchange="SRC_changePageSize(this.value)">
+          <option value="20" ${SRC.pageSize===20?'selected':''}>每页 20 条</option>
+          <option value="50" ${SRC.pageSize===50?'selected':''}>每页 50 条</option>
+        </select>
+        <button class="btn btn-ghost pg-btn" onclick="SRC_goPage(${pg.page-1})" ${pg.page<=1?'disabled':''}>上一页</button>
+        <button class="btn btn-ghost pg-btn" onclick="SRC_goPage(${pg.page+1})" ${pg.page>=pg.total_pages?'disabled':''}>下一页</button>
+      </div>`;
+    el.after(pgDiv);
+  }
+
+  window.SRC_goPage = function(page){
+    if(!SRC.pagination) return;
+    if(page < 1 || page > SRC.pagination.total_pages) return;
+    SRC.page = page;
+    loadSources();
+  };
+
+  window.SRC_changePageSize = function(size){
+    SRC.pageSize = parseInt(size);
+    SRC.page = 1;
+    loadSources();
+  };
 
   /* ---------- 新增数据源 ---------- */
   window.SRC_toggleAddMenu = function(){

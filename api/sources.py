@@ -71,10 +71,14 @@ def delete_category(cid):
 # ----------------------------------------------------------------------------
 @bp.route("/sources", methods=["GET"])
 def list_sources():
-    """获取数据源列表，支持 category_id 筛选和 keyword 搜索。
-    category_id=none 表示筛选未分类（category_id IS NULL）。"""
+    """获取数据源列表，支持分类筛选、关键词搜索、分页。
+    category_id=none 表示筛选未分类；page/page_size 控制分页。"""
     cat_param = request.args.get("category_id", type=str)
     keyword = request.args.get("keyword", "").strip() or None
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 20, type=int)
+    if page_size not in (20, 50, 100):
+        page_size = 20
     filter_null = False
     category_id = None
     if cat_param == "none":
@@ -84,10 +88,15 @@ def list_sources():
             category_id = int(cat_param)
         except ValueError:
             category_id = None
-    sources = DataSourceDAO.list_all(category_id=category_id, keyword=keyword, filter_null=filter_null)
+    sources, total = DataSourceDAO.list_all(
+        category_id=category_id, keyword=keyword, filter_null=filter_null,
+        page=page, page_size=page_size
+    )
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
     return jsonify({
         "ok": True,
         "data": sources,
+        "pagination": {"page": page, "page_size": page_size, "total": total, "total_pages": total_pages},
         "stats": {
             "total": DataSourceDAO.count_all(),
             "ready": DataSourceDAO.count_by_status("ready"),

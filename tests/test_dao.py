@@ -64,7 +64,7 @@ check("delete 后查不到", CategoryDAO.get_by_id(cid) is None)
 print("\n===== DataSourceDAO =====")
 
 # 清理旧测试数据
-for ds in DataSourceDAO.list_all():
+for ds in DataSourceDAO.list_all()[0]:
     if ds["name"].startswith(P):
         DataSourceDAO.delete(ds["id"])
 for c in CategoryDAO.list_all():
@@ -94,15 +94,15 @@ check("get_by_id config JSON 反序列化正确", ds["config"] == {"sheet": "明
 check("get_by_id 默认 status=pending", ds["status"] == "pending")
 
 # list_all 全量
-all_ds = DataSourceDAO.list_all()
+all_ds = DataSourceDAO.list_all()[0]
 check("list_all 包含新建数据源", any(x["id"] == sid for x in all_ds), f"共{len(all_ds)}个")
 
 # list_all 按分类筛选
-by_cat = DataSourceDAO.list_all(category_id=cat_id)
+by_cat = DataSourceDAO.list_all(category_id=cat_id)[0]
 check("list_all 按分类筛选命中", len(by_cat) >= 1 and any(x["id"] == sid for x in by_cat), f"命中{len(by_cat)}个")
 
 # list_all 关键词搜索
-by_kw = DataSourceDAO.list_all(keyword="测试数据源")
+by_kw = DataSourceDAO.list_all(keyword="测试数据源")[0]
 check("list_all 关键词搜索命中", any(x["id"] == sid for x in by_kw), f"命中{len(by_kw)}个")
 
 # update

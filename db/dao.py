@@ -95,28 +95,38 @@ class DataSourceDAO(BaseDAO):
     """数据源 DAO。"""
 
     @staticmethod
-    def list_all(category_id=None, keyword=None, filter_null=False):
-        """获取数据源列表，支持按分类筛选和关键词搜索（名称模糊匹配）。
+    def list_all(category_id=None, keyword=None, filter_null=False, page=1, page_size=None):
+        """获取数据源列表，支持分类筛选、关键词搜索（名称+原始文件名）、分页。
         filter_null=True 时筛选 category_id IS NULL（未分类）。"""
-        sql = "SELECT ds.*, c.name AS category_name FROM data_sources ds LEFT JOIN categories c ON ds.category_id = c.id WHERE 1=1"
+        where = "WHERE 1=1"
         params = []
         if filter_null:
-            sql += " AND ds.category_id IS NULL"
+            where += " AND ds.category_id IS NULL"
         elif category_id is not None:
-            sql += " AND ds.category_id = %s"
+            where += " AND ds.category_id = %s"
             params.append(category_id)
         if keyword:
-            sql += " AND ds.name LIKE %s"
-            params.append(f"%{keyword}%")
-        sql += " ORDER BY ds.updated_at DESC, ds.id DESC"
+            where += " AND (ds.name LIKE %s OR ds.config LIKE %s)"
+            params.extend([f"%{keyword}%", f"%{keyword}%"])
+        # 总数
+        count_sql = f"SELECT COUNT(*) AS cnt FROM data_sources ds LEFT JOIN categories c ON ds.category_id = c.id {where}"
+        with DataSourceDAO._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(count_sql, params)
+                total = cur.fetchone()["cnt"]
+        # 数据
+        sql = f"SELECT ds.*, c.name AS category_name FROM data_sources ds LEFT JOIN categories c ON ds.category_id = c.id {where} ORDER BY ds.updated_at DESC, ds.id DESC"
+        if page_size:
+            offset = (page - 1) * page_size
+            sql += " LIMIT %s OFFSET %s"
+            params.extend([page_size, offset])
         with DataSourceDAO._conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
                 rows = cur.fetchall()
-        # 反序列化 JSON 字段
         for r in rows:
             DataSourceDAO._deserialize(r)
-        return rows
+        return rows, total
 
     @staticmethod
     def get_by_id(source_id):
@@ -131,7 +141,7 @@ class DataSourceDAO(BaseDAO):
 
     @staticmethod
     def _deserialize(row):
-        """将 MySQL JSON 字段反序列化为 Python 对象。"""
+        """将 MySQL JSON 字段反序列化，datetime 转本地时间字符串（避免 jsonify 时区错误）。"""
         for key in ("config", "sheet_names"):
             val = row.get(key)
             if isinstance(val, str):
@@ -139,6 +149,10 @@ class DataSourceDAO(BaseDAO):
                     row[key] = json.loads(val)
                 except (json.JSONDecodeError, TypeError):
                     pass
+        for key in ("created_at", "updated_at", "last_collected_at"):
+            val = row.get(key)
+            if isinstance(val, datetime):
+                row[key] = val.strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
     def create(name, channel, category_id=None, file_path=None, config=None,
