@@ -311,7 +311,10 @@
       body.innerHTML = `
         <div class="form-row">
           <label>文件夹路径 <span class="hint">本地绝对路径</span></label>
-          <input type="text" id="folderPath" placeholder="例如：D:\\数据\\8月报表">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="folderPath" placeholder="例如：D:\\数据\\8月报表" style="flex:1">
+            <button type="button" class="btn btn-ghost" onclick="SRC_selectFolder()" style="white-space:nowrap">📁 选择文件夹</button>
+          </div>
         </div>
         <div class="form-row">
           <label>
@@ -335,6 +338,18 @@
 
   window.SRC_onFilePick = function(input){
     if(input.files[0]) $("excelFileName").textContent = input.files[0].name;
+  };
+
+  window.SRC_selectFolder = async function(){
+    try{
+      const r = await fetch("/api/select-folder");
+      const j = await r.json();
+      if(j.ok && j.path){
+        $("folderPath").value = j.path;
+      }
+    }catch(e){
+      toast("选择文件夹失败", "err");
+    }
   };
 
   window.SRC_submitAdd = async function(){

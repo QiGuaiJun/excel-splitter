@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """分类与数据源 CRUD 路由。"""
 import os
+import tkinter as tk
+from tkinter import filedialog
 from flask import Blueprint, request, jsonify
 from db.dao import CategoryDAO, DataSourceDAO
 
@@ -219,3 +221,20 @@ def inspect_source(sid):
         return jsonify({"ok": False, "msg": f"不支持的文件格式: {ext}"}), 400
 
     return jsonify({"ok": True, "file_id": str(sid), "filename": ds["name"], "sheets": sheets})
+
+
+# ----------------------------------------------------------------------------
+# 系统文件夹选择对话框
+# ----------------------------------------------------------------------------
+@bp.route("/select-folder", methods=["GET"])
+def select_folder():
+    """弹出系统文件夹选择对话框，返回用户选择的文件夹路径。
+    用于本地工作台，Flask 运行在用户本机，可直接调用系统对话框。"""
+    root = tk.Tk()
+    root.withdraw()  # 隐藏主窗口
+    root.attributes("-topmost", True)  # 置顶
+    try:
+        folder_path = filedialog.askdirectory(title="选择要导入的文件夹")
+    finally:
+        root.destroy()
+    return jsonify({"ok": True, "path": folder_path if folder_path else None})
