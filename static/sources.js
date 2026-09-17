@@ -403,6 +403,85 @@
     }catch(e){ toast("网络错误", "err"); }
   };
 
+  /* ---------- 分发模块：从数据源中心选择 ---------- */
+  let PICKER_CACHE = [];
+
+  window.openSourcePicker = async function(){
+    showModal("sourcePickerModal");
+    $("pickerSearch").value = "";
+    $("pickerList").innerHTML = `<div class="empty-state"><span class="spinner"></span> 加载中...</div>`;
+    try{
+      const r = await fetch("/api/sources");
+      const j = await r.json();
+      if(j.ok){
+        PICKER_CACHE = j.data.filter(s => s.channel === "excel" && s.status === "ready");
+        renderSourcePicker();
+      } else {
+        $("pickerList").innerHTML = `<div class="empty-state">加载失败：${esc(j.msg)}</div>`;
+      }
+    }catch(e){
+      $("pickerList").innerHTML = `<div class="empty-state">网络错误</div>`;
+    }
+  };
+
+  window.renderSourcePicker = function(){
+    const kw = ($("pickerSearch")?.value || "").trim().toLowerCase();
+    const list = kw ? PICKER_CACHE.filter(s => s.name.toLowerCase().includes(kw)) : PICKER_CACHE;
+    const el = $("pickerList");
+    if(!list.length){
+      el.innerHTML = `<div class="empty-state"><div class="big">📂</div>${kw ? "没有匹配的数据源" : "暂无已就绪的 Excel 数据源，请先到「数据采集」模块添加"}</div>`;
+      return;
+    }
+    el.innerHTML = list.map(ds=>`
+      <div class="src-card" onclick="pickSource(${ds.id})">
+        <div class="sc-head">
+          <div class="sc-icon">${CHANNEL_ICON[ds.channel]||CHANNEL_ICON.excel}</div>
+          <div class="sc-name">${esc(ds.name)}</div>
+          <span class="status-tag ready">已就绪</span>
+        </div>
+        <div class="sc-meta">
+          <span>行数 <b>${ds.row_count||0}</b></span>
+          <span>列数 <b>${ds.col_count||0}</b></span>
+          <span>子表 <b>${(ds.sheet_names||[]).length}</b></span>
+          <span>分类 <b>${esc(ds.category_name||"未分类")}</b></span>
+        </div>
+        <div style="font-size:12px;color:var(--primary-d);font-weight:600;margin-top:auto">点击选用 →</div>
+      </div>`).join("");
+  };
+
+  window.pickSource = async function(id){
+    const ds = PICKER_CACHE.find(s=>s.id===id);
+    if(!ds) return;
+    try{
+      const r = await fetch(`/api/sources/${id}/inspect`);
+      const j = await r.json();
+      if(!j.ok) throw new Error(j.msg || "读取失败");
+      // 复用分发模块的 upload 后续逻辑
+      if(typeof S !== "undefined"){
+        S.data = j;
+        S.sheets = j.sheets[0] ? [j.sheets[0].name] : [];
+        S.srcName = "来源";
+        S.srcMap = {};
+        S.includeDetail = true;
+        if(typeof syncOutMode === "function") syncOutMode();
+        if(typeof initCfg === "function") initCfg();
+      }
+      const dropBig = $("dropBig");
+      if(dropBig) dropBig.textContent = "点击重新选择，或拖拽替换文件";
+      const fileInfo = $("fileInfo");
+      if(fileInfo){
+        fileInfo.innerHTML = `<div class="file-pick"><div class="fi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" fill="#dff1ef"/><path d="M14 3v4h4" stroke="#0f9d8f" stroke-width="1.6"/></svg></div><div><div class="fn">${esc(j.filename)}</div><div class="fs">来自数据源中心 · ${j.sheets.length} 个子表 · 读取成功</div></div><button class="linkbtn" onclick="openSourcePicker()">重新选择</button></div>`;
+      }
+      const sheetWrap = $("sheetWrap");
+      if(sheetWrap) sheetWrap.style.display = "block";
+      if(typeof renderSheets === "function") renderSheets();
+      hideModal("sourcePickerModal");
+      toast(`已从数据源中心载入：${j.filename}`, "ok");
+    }catch(e){
+      toast("读取失败：" + e.message, "err");
+    }
+  };
+
   /* ---------- 初始化 ---------- */
   function init(){
     // 点击 step 导航时移除模块入口高亮

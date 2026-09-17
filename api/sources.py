@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """分类与数据源 CRUD 路由。"""
+import os
 from flask import Blueprint, request, jsonify
 from db.dao import CategoryDAO, DataSourceDAO
 
@@ -133,3 +134,78 @@ def delete_source(sid):
         return jsonify({"ok": False, "msg": "数据源不存在"}), 404
     ok = DataSourceDAO.delete(sid)
     return jsonify({"ok": ok})
+
+
+# ----------------------------------------------------------------------------
+# 数据源 inspect：从已登记数据源读取，返回与 /api/inspect 相同格式
+# ----------------------------------------------------------------------------
+@bp.route("/sources/<int:sid>/inspect", methods=["GET"])
+def inspect_source(sid):
+    """读取已登记数据源的子表与字段，返回格式与 /api/inspect 一致。"""
+    ds = DataSourceDAO.get_by_id(sid)
+    if not ds:
+        return jsonify({"ok": False, "msg": "数据源不存在"}), 404
+    file_path = ds.get("file_path")
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({"ok": False, "msg": "源文件不存在或已被移动"}), 400
+
+    ext = os.path.splitext(file_path)[1].lower()
+    sheets = []
+
+    if ext in (".xlsx", ".xlsm"):
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True, data_only=True)
+        try:
+            for name in wb.sheetnames:
+                ws = wb[name]
+                rows = []
+                for i, row in enumerate(ws.iter_rows(max_row=301, values_only=True)):
+                    rows.append(list(row))
+                    if i >= 300:
+                        break
+                if not rows:
+                    sheets.append({"name": name, "columns": [], "preview": [], "colMeta": {}})
+                    continue
+                raw_cols = [str(c).strip() if c is not None else "" for c in rows[0]]
+                valid_idx = [i for i, c in enumerate(raw_cols) if c and not c.startswith("Unnamed")]
+                cols = [raw_cols[i] for i in valid_idx]
+                # 判断每列是否数值型（前300行样本）
+                col_meta = {}
+                for ci, col_name in enumerate(cols):
+                    orig_i = valid_idx[ci]
+                    num_cnt, total = 0, 0
+                    for r in rows[1:]:
+                        if orig_i < len(r):
+                            v = r[orig_i]
+                            if v is not None and str(v).strip() != "":
+                                total += 1
+                                try:
+                                    float(v); num_cnt += 1
+                                except (ValueError, TypeError):
+                                    pass
+                    is_num = total > 0 and num_cnt / total > 0.8
+                    col_meta[col_name] = {"numeric": is_num, "measure": is_num}
+                preview = [[(r[i] if i < len(r) and r[i] is not None else "") for i in valid_idx] for r in rows[1:4]]
+                sheets.append({"name": name, "columns": cols, "preview": preview, "colMeta": col_meta})
+        finally:
+            wb.close()
+    elif ext == ".csv":
+        import csv
+        with open(file_path, "r", encoding="utf-8-sig", errors="replace") as f:
+            reader = csv.reader(f)
+            rows = []
+            for i, row in enumerate(reader):
+                rows.append(row)
+                if i >= 300:
+                    break
+        if rows:
+            cols = [c.strip() for c in rows[0]]
+            col_meta = {c: {"numeric": False, "measure": False} for c in cols}
+            preview = rows[1:4]
+            sheets.append({"name": "Sheet1", "columns": cols, "preview": preview, "colMeta": col_meta})
+        else:
+            sheets.append({"name": "Sheet1", "columns": [], "preview": [], "colMeta": {}})
+    else:
+        return jsonify({"ok": False, "msg": f"不支持的文件格式: {ext}"}), 400
+
+    return jsonify({"ok": True, "file_id": str(sid), "filename": ds["name"], "sheets": sheets})
