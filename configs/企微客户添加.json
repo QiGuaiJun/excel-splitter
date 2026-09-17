@@ -1,0 +1,46 @@
+{
+  "name": "企微客户添加",
+  "updated": "2026-09-10 15:09:13",
+  "config": {
+    "sheets": [
+      "客户列表"
+    ],
+    "source_col": "来源",
+    "source_map": {},
+    "keep_columns": [
+      "添加人",
+      "归属市场",
+      "门店编码",
+      "门店名称",
+      "添加时间",
+      "来源"
+    ],
+    "mask": {},
+    "split_column": "归属市场",
+    "suffix": "-企微客户添加达成（0910）",
+    "summary": {
+      "enabled": true,
+      "groups": [
+        {
+          "col": "添加人"
+        },
+        {
+          "col": "归属市场"
+        },
+        {
+          "col": "门店名称"
+        }
+      ],
+      "sums": [],
+      "counts": [
+        {
+          "col": "添加时间",
+          "label": "记录数",
+          "distinct": false
+        }
+      ],
+      "sort_label": "记录数",
+      "sort_desc": true
+    }
+  }
+}

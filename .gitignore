@@ -1,0 +1,20 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 上传的源数据（可能含业务/客户数据，禁止入库）----
+uploads/
+
+# ---- 运行 / 测试临时输出 ----
+_*/
+*.log
+
+# ---- 系统 / 编辑器 ----
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

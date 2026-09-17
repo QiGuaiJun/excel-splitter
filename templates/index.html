@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel 智能分表脱敏工作台</title>
+<style>
+:root{
+  --bg:#edf1f2;--panel:#fff;--ink:#102b27;--sub:#5d726d;--faint:#8ba09a;
+  --line:#e6eceb;--primary:#0f9d8f;--primary-d:#0b7d72;--primary-soft:#e7f6f4;
+  --ok:#15a34a;--err:#e03131;--err-soft:#fdecec;--gold:#d7a84a;
+  --side1:#0b2925;--side2:#0e3b34;--shadow:0 10px 34px rgba(13,52,47,.08);--radius:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Microsoft YaHei","PingFang SC",-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6}
+.app{display:grid;grid-template-columns:250px 1fr;height:100vh;overflow:hidden}
+aside{background:linear-gradient(165deg,var(--side1),var(--side2));color:#cfe3de;display:flex;flex-direction:column;padding:22px 16px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#19b6a6,#0b7d72);display:flex;align-items:center;justify-content:center;flex:none}
+.brand h1{font-size:15px;color:#fff;font-weight:700}
+.brand p{font-size:11px;color:#7fa39c;margin-top:1px}
+.nav{margin-top:16px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
+.step{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;cursor:pointer;color:#9fc0b9;transition:.15s;border:1px solid transparent}
+.step:hover{background:rgba(255,255,255,.06)}
+.step .dot{width:25px;height:25px;border-radius:50%;background:rgba(255,255,255,.08);color:#cfe3de;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
+.step .t{font-size:13px;font-weight:600}
+.step.active{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
+.step.active .dot{background:var(--primary);color:#fff;box-shadow:0 0 0 4px rgba(15,157,143,.2)}
+.step.active .t{color:#fff}
+.side-foot{margin-top:auto;padding:12px 12px 2px;border-top:1px solid rgba(255,255,255,.08);font-size:11.5px;color:#7fa39c;display:flex;gap:8px;align-items:flex-start}
+main{display:flex;flex-direction:column;overflow:hidden}
+.topbar{padding:22px 40px 0;display:flex;align-items:flex-end;justify-content:space-between}
+.topbar .crumb{font-size:12px;color:var(--faint);letter-spacing:1px}
+.topbar h2{font-size:22px;font-weight:700;margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--primary-d);background:var(--primary-soft);padding:6px 12px;border-radius:999px;font-weight:600}
+.tplbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fbfdfd;border:1px solid var(--line);border-radius:14px;padding:11px 16px;margin:16px 40px 0}
+.tplbar .tpl-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;color:var(--primary-d);white-space:nowrap}
+.tplbar .tpl-title svg{flex:none}
+.tplbar select{min-width:190px}
+.tplbar .tpl-msg{font-size:12.5px;color:#8a6a12;background:#fdf6e3;border:1px solid #f0dcae;border-radius:8px;padding:5px 11px;display:none;line-height:1.5}
+.tplbar .tpl-msg.show{display:inline-block}
+.tplbar .tpl-msg.warn{color:#a12828;background:#fdf0f0;border-color:#f0c9c9}
+.stage{flex:1;overflow-y:auto;padding:22px 40px 30px}
+.panel{display:none;animation:fade .25s ease}.panel.show{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.card+.card{margin-top:18px}
+.card h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.card .desc{color:var(--sub);font-size:13px;margin-bottom:18px}
+.drop{border:2px dashed #b9cfca;border-radius:14px;padding:38px 24px;text-align:center;cursor:pointer;transition:.18s;background:#fbfdfd}
+.drop:hover,.drop.over{border-color:var(--primary);background:var(--primary-soft)}
+.drop .ic{width:52px;height:52px;margin:0 auto 10px;border-radius:14px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center}
+.drop .big{font-size:15px;font-weight:700}.drop .small{font-size:12.5px;color:var(--faint);margin-top:5px}
+.file-pick{display:flex;align-items:center;gap:14px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:13px 16px;margin-bottom:20px}
+.file-pick .fi{width:40px;height:40px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.file-pick .fn{font-weight:700;font-size:14px;word-break:break-all}.file-pick .fs{font-size:12px;color:var(--primary-d)}
+.linkbtn{margin-left:auto;color:var(--primary-d);font-weight:600;font-size:13px;cursor:pointer;background:none;border:none;white-space:nowrap}
+.sheet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px}
+.sheet-opt{border:2px solid var(--line);border-radius:13px;padding:15px;cursor:pointer;transition:.15s;background:#fff}
+.sheet-opt:hover{border-color:#9fd6d0}.sheet-opt.sel{border-color:var(--primary);background:var(--primary-soft)}
+.sheet-opt .sn{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.sheet-opt .sc{font-size:12px;color:var(--sub);margin-top:5px}
+.sheet-opt .tick{margin-left:auto;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;display:none;align-items:center;justify-content:center;flex:none}
+.sheet-opt.sel .tick{display:flex}
+.tools{display:flex;gap:9px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.btn{font-family:inherit;cursor:pointer;border-radius:10px;font-size:13.5px;font-weight:600;padding:9px 16px;border:1px solid transparent;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+.btn-ghost{background:#f1f5f4;color:#334844;border-color:var(--line)}.btn-ghost:hover{background:#e6eeec}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 18px rgba(15,157,143,.28)}.btn-primary:hover{background:var(--primary-d)}
+.btn-primary:disabled{background:#b6c9c5;box-shadow:none;cursor:not-allowed}
+select,input[type=text]{font-family:inherit;font-size:13.5px;padding:8px 11px;border:1px solid #cfdcd9;border-radius:9px;background:#fff;color:var(--ink)}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(15,157,143,.12)}
+select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
+.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.fcard{border:1.5px solid var(--line);border-radius:11px;padding:11px 12px;cursor:pointer;transition:.13s;background:#fff;display:flex;flex-direction:column;gap:7px}
+.fcard:hover{border-color:#9fd6d0}
+.fcard.on{border-color:var(--primary);background:var(--primary-soft)}
+.fcard .fk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.fcard .fk input{width:16px;height:16px;accent-color:var(--primary);flex:none}
+.fcard .fmeta{display:flex;gap:6px;flex-wrap:wrap}
+.gcard{border-color:#cfe0ee}
+.gcard.on{border-color:#378add;background:#eef6fd}
+.gcard .fk{color:#0c447c}
+.gcard select{margin-top:2px}
+.dim-hint{font-size:12px;color:#0c447c;background:#eef6fd;border:1px solid #d4e5f4;border-radius:8px;padding:7px 10px;margin-bottom:10px}
+.mini-tag{font-size:10.5px;padding:1px 7px;border-radius:6px;font-weight:600;background:#eef2f1;color:var(--sub)}
+.mini-tag.num{background:#fff3df;color:#b07a1a}.mini-tag.mask{background:#fdecec;color:#c0392b}
+.sub-block{border:1px dashed #cfe0dd;border-radius:12px;padding:16px 18px;margin-top:18px;background:#fbfdfd}
+.sub-block .lab{font-size:13.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.sub-block .lab .step-hint{font-weight:400;font-size:12px;color:var(--faint)}
+.mask-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.mask-item{display:flex;align-items:center;gap:8px;font-size:13px}
+.mask-item .mn{width:120px;flex:none;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mask-item select{flex:1;min-width:0}
+.opt-extra{font-size:12.5px;color:var(--sub)}.opt-extra input{width:44px;padding:6px 7px;margin:0 2px}
+.switch{position:relative;width:42px;height:23px;display:inline-block}.switch input{display:none}
+.switch i{position:absolute;inset:0;background:#cdd8d5;border-radius:999px;transition:.18s;cursor:pointer}
+.switch i:after{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.18s}
+.switch input:checked+i{background:var(--primary)}.switch input:checked+i:after{transform:translateX(19px)}
+.table-wrap{border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{background:#f6f9f8;text-align:left;font-size:12px;color:var(--sub);font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td{padding:10px 14px;border-bottom:1px solid #f0f4f3;font-size:13.5px}
+tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbody tr.masked{background:#f3faf9}
+.fname{font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.col-tag{font-size:10.5px;background:#eef2f1;color:var(--sub);padding:1px 7px;border-radius:6px;font-weight:600}.num-tag{background:#fff3df;color:#b07a1a}
+.big-input{width:100%;font-size:15px;padding:13px 15px}
+.name-preview{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;background:#f6faf9;border:1px solid #cfe7e3;border-radius:12px;padding:15px 17px}
+.name-preview .chip{background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:4px 11px;border-radius:8px}
+.name-preview .note{width:100%;font-size:12px;color:var(--sub);margin-top:4px}
+.path-row{display:flex;gap:10px}.path-row input{flex:1;font-size:14px}
+.dir-hint{margin-top:12px;font-size:12.5px;color:var(--sub);display:flex;gap:8px;align-items:flex-start}
+.sum-toggle{display:flex;align-items:center;gap:12px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.sum-toggle .tt{font-weight:700}.sum-toggle .ts{font-size:12px;color:var(--primary-d)}
+.summary{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.summary .k{background:#f6f9f8;padding:12px 16px;font-size:12.5px;color:var(--sub);border-bottom:1px solid var(--line);font-weight:600}
+.summary .v{padding:12px 16px;font-size:13.5px;font-weight:600;border-bottom:1px solid var(--line);word-break:break-all}
+.summary .k:nth-last-child(2),.summary .v:last-child{border-bottom:none}
+.result-hero{text-align:center;padding:26px 20px 6px}
+.result-hero .ric{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.result-hero.ok .ric{background:#e9f8ef}.result-hero.err .ric{background:var(--err-soft)}
+.result-hero h3{font-size:20px;margin-bottom:4px}.result-hero p{color:var(--sub);font-size:13.5px;word-break:break-all}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.stat{background:#f8fbfa;border:1px solid var(--line);border-radius:13px;padding:16px;text-align:center}
+.stat .n{font-size:26px;font-weight:800;color:var(--primary-d)}.stat .l{font-size:12px;color:var(--sub);margin-top:2px}
+.filelist{max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:12px}
+.fi-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f0f4f3;font-size:13px}.fi-row:last-child{border-bottom:none}
+.fi-row .cnt{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
+.alert{border-radius:12px;padding:14px 16px;font-size:13.5px;margin-top:16px}
+.alert.err{background:var(--err-soft);border:1px solid #f3c0c0;color:#a12828}
+.alert table{margin-top:10px;font-size:12.5px;background:#fff;border-radius:8px;width:100%}
+.alert th{background:#fbe4e4}.alert th,.alert td{border:1px solid #f0c9c9;padding:6px 10px;text-align:left}
+.footer{padding:16px 40px;border-top:1px solid var(--line);background:#fff;display:flex;align-items:center;gap:12px}
+.footer .spacer{flex:1}
+.btn-back{background:#fff;border-color:var(--line);color:var(--sub)}.btn-back:hover{background:#f4f7f6}
+.btn-next{padding:11px 28px;font-size:14.5px}
+.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:10px}.brand{border:none;padding:0 12px 0 0}.nav{flex-direction:row;margin:0}.step .d,.side-foot{display:none}.stage,.topbar,.footer{padding-left:18px;padding-right:18px}.summary{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M15 15l2 2 4-4" stroke="#7fe0d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><h1>分表脱敏工作台</h1><p>Split · Mask · Summary</p></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="#7fa39c" stroke-width="1.6" stroke-linejoin="round"/></svg><span>本地运行，数据不离开本机</span></div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div><div class="crumb" id="crumb">STEP 1 / 6</div><h2 id="title">文件与子表</h2></div>
+      <div class="badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#0b7d72" stroke-width="2"/><path d="M8 12l3 3 5-6" stroke="#0b7d72" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>本地处理 · 安全</div>
+    </div>
+
+    <div class="tplbar" id="tplbar">
+      <div class="tpl-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 4h6m-6 0a2 2 0 00-2 2v14a2 2 0 002 2h6a2 2 0 002-2V6a2 2 0 00-2-2m-6 0V2h6v2M7 10h10M7 14h6" stroke="#0b7d72" stroke-width="1.8" stroke-linecap="round"/></svg>配置模板</div>
+      <select id="tplSel" title="选择要套用的模板"><option value="">— 选择模板 —</option></select>
+      <button class="btn btn-ghost" id="tplApply" type="button">套用</button>
+      <button class="btn btn-ghost" id="tplSave" type="button">保存当前配置</button>
+      <button class="btn btn-ghost" id="tplRename" type="button">重命名</button>
+      <button class="btn btn-ghost" id="tplDel" type="button">删除</button>
+      <span class="tpl-msg" id="tplMsg"></span>
+    </div>
+
+    <div class="stage">
+      <!-- 1 文件+子表 -->
+      <section class="panel show" data-step="1">
+        <div class="card">
+          <h3>选择 Excel 文件</h3>
+          <p class="desc">支持 .xlsx / .xls / .xlsm，文件仅在本机读取。</p>
+          <div class="drop" id="drop">
+            <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="#0f9d8f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2" stroke="#0f9d8f" stroke-width="2" stroke-linecap="round"/></svg></div>
+            <div class="big" id="dropBig">点击选择，或将 Excel 拖拽到此处</div>
+            <div class="small">读取后在下方选择要处理的子表</div>
+            <input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden>
+          </div>
+          <div id="fileInfo"></div>
+          <div id="sheetWrap" style="display:none">
+            <div class="lab" style="font-size:13.5px;font-weight:700;margin:4px 0 10px">选择要处理的子表（点一张=处理单张；点多张=上下合并）</div>
+            <div id="mergeTip" style="display:none;align-items:center;gap:9px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:11px;padding:11px 15px;margin-bottom:14px;font-size:13px;color:var(--primary-d);line-height:1.5"></div>
+            <div class="sheet-grid" id="sheetGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 字段与脱敏 -->
+      <section class="panel" data-step="2">
+        <div class="card">
+          <h3>选择保留字段</h3>
+          <p class="desc">勾选要保留的字段（默认不勾）；没勾的字段不会出现在结果里。</p>
+          <div class="tools">
+            <button class="btn btn-ghost" id="allKeep" type="button">全选</button>
+            <button class="btn btn-ghost" id="noneKeep" type="button">全不选</button>
+            <span style="font-size:12.5px;color:var(--faint)" id="keepStat">尚未勾选字段</span>
+          </div>
+          <div class="field-grid" id="fieldGrid"></div>
+
+          <div class="sub-block" id="splitBlock">
+            <div class="lab">拆分列 <span class="step-hint">按这一列的每个不同值各拆一个文件（如市场 / 部门）</span></div>
+            <select id="splitSel" style="min-width:220px"><option value="">请先在上方勾选字段</option></select>
+          </div>
+
+          <div class="sub-block" id="maskBlock">
+            <div class="lab">脱敏规则 <span class="step-hint">只需给需要脱敏的列设置，其余保持“不脱敏”</span></div>
+            <div class="mask-grid" id="maskGrid"><span style="font-size:12.5px;color:var(--faint)">勾选保留字段后，可在此设置脱敏</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 汇总 -->
+      <section class="panel" data-step="3">
+        <div class="card">
+          <h3>为本市场生成「汇总」Sheet</h3>
+          <p class="desc">字段已自动分区识别并给出推荐配置，可直接用；右侧实时预览默认市场（数据条数最多）的汇总效果，与导出格式一致。</p>
+          <div class="sum-toggle">
+            <label class="switch"><input type="checkbox" id="sumEnabled" checked><i></i></label>
+            <div><div class="tt">启用汇总表</div><div class="ts">关闭则只输出脱敏明细</div></div>
+            <button class="btn btn-ghost" id="autoSum" type="button" style="margin-left:auto">恢复推荐</button>
+          </div>
+          <div class="sum-toggle" style="gap:14px;margin-top:2px">
+            <span style="font-size:13.5px;font-weight:700;color:var(--ink)">输出内容</span>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer"><input type="radio" name="outMode" value="both" checked style="accent-color:var(--primary)">明细 + 汇总</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer"><input type="radio" name="outMode" value="sumonly" style="accent-color:var(--primary)">仅汇总（不要明细）</label>
+            <span style="font-size:12px;color:var(--faint)">选“仅汇总”时请保持上方汇总开关开启</span>
+          </div>
+          <div id="sumConfig">
+            <div style="display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start">
+              <div>
+                <div class="sub-block">
+                  <div class="lab">文本维度 <span class="step-hint">勾选或选「分组维度」= 按此列分组；编号类列可计数</span></div>
+                  <div class="dim-hint" id="dimHint"></div>
+                  <div class="field-grid" id="sumGroupGrid"></div>
+                </div>
+                <div class="sub-block">
+                  <div class="lab">数值指标 <span class="step-hint">勾选=参与汇总；类型可选求和 / 计数；手机号等编号列已自动排除</span></div>
+                  <div class="table-wrap" style="margin-top:4px"><table>
+                    <thead><tr><th>字段</th><th style="width:118px">类型</th><th>输出列名（可改）</th></tr></thead>
+                    <tbody id="sumMetricBody"></tbody>
+                  </table></div>
+                </div>
+                <div class="tools" style="margin-top:14px">
+                  <span style="font-size:13px;font-weight:600">排序：</span>
+                  <select id="sumSort"></select>
+                  <select id="sumOrder"><option value="desc">从大到小</option><option value="asc">从小到大</option></select>
+                  <span style="font-size:12.5px;color:var(--faint)">合计行始终在最后</span>
+                </div>
+              </div>
+              <div>
+                <div class="sub-block" style="margin-top:0">
+                  <div class="lab">市场预览 <span class="step-hint">默认显示数据条数最多的市场 · 切换市场或改配置实时刷新</span></div>
+                  <select id="pvMarket" style="width:100%;margin-bottom:10px"></select>
+                  <div class="table-wrap" style="max-height:400px;overflow:auto"><table>
+                    <thead id="pvThead"></thead>
+                    <tbody id="pvTbody"><tr><td style="color:var(--faint);text-align:center;padding:26px">请先在第 2 步选择拆分列</td></tr></tbody>
+                  </table></div>
+                  <div class="dir-hint"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:2px"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke="#0f9d8f" stroke-width="1.7" stroke-linejoin="round"/></svg><span>预览与拆分后文件里的「汇总」Sheet 格式完全一致（所见即所得）</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 命名 -->
+      <section class="panel" data-step="4">
+        <div class="card">
+          <h3>设置拆分后的文件名</h3>
+          <p class="desc">每份文件名 = 拆分列的值 + 你写的后缀。</p>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">文件名后缀（可留空）</div>
+          <input type="text" class="big-input" id="suffix" placeholder="例如：8月企微好友添加进度（0826）">
+          <div class="name-preview">
+            <span class="chip" id="pvChip">市场名</span><span id="pvSuffix" style="font-weight:700"></span><span style="color:var(--faint)">.xlsx</span>
+            <span class="note">每个不同值各生成一份，内含「明细」「汇总」两个 Sheet</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 输出 -->
+      <section class="panel" data-step="5">
+        <div class="card">
+          <h3>选择输出文件夹</h3>
+          <p class="desc">拆分好的文件保存到该文件夹，由你自行分发。</p>
+          <div class="path-row">
+            <input type="text" id="outdir" placeholder="点“浏览”选择，或直接粘贴文件夹路径">
+            <button class="btn btn-ghost" id="browse" type="button">浏览…</button>
+          </div>
+          <div class="dir-hint"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:2px"><path d="M12 9v4m0 4h.01M10.3 3.9L2.6 17a2 2 0 001.7 3h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" stroke="#d7a84a" stroke-width="1.7" stroke-linejoin="round"/></svg><span>拆分列若有空值或一格多值，会中止并精确列出问题行，不产出错误文件。</span></div>
+        </div>
+      </section>
+
+      <!-- 6 确认 -->
+      <section class="panel" data-step="6">
+        <div class="card">
+          <h3>确认并开始拆分</h3>
+          <p class="desc">核对配置，无误后点击开始。</p>
+          <div class="summary" id="summary"></div>
+          <div style="margin-top:22px"><button class="btn btn-primary" id="run" style="width:100%;justify-content:center;padding:14px;font-size:15.5px">开始拆分</button></div>
+          <div id="result"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span class="spacer"></span>
+      <button class="btn btn-back" id="btnPrev" type="button">上一步</button>
+      <button class="btn btn-primary btn-next" id="btnNext" type="button">下一步</button>
+    </div>
+  </main>
+</div>
+
+<script>
+const TOTAL=6;
+const STEPS=[
+  {t:"文件与子表",d:"上传并选 Sheet"},
+  {t:"字段与脱敏",d:"保留/脱敏/拆分列"},
+  {t:"汇总设置",d:"分组/求和/计数"},
+  {t:"文件命名",d:"统一后缀"},
+  {t:"输出位置",d:"目标文件夹"},
+  {t:"确认拆分",d:"执行与结果"}
+];
+const RULE_LABEL={phone:"手机号 138****5678",idcard:"身份证 前4后4",address:"详细地址 保留到区县",name:"姓名 留姓",keep_ab:"保留前/后几位",replace:"替换为文字"};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},split:"",suffix:"",outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
+
+/* 自由导航：任意步骤可点 */
+function renderNav(){
+  $("nav").innerHTML=STEPS.map((s,i)=>{
+    const n=i+1;return `<div class="step ${n===S.step?"active":""}" data-go="${n}"><span class="dot">${n}</span><span class="t">${s.t}</span></div>`;
+  }).join("");
+  document.querySelectorAll(".step").forEach(el=>el.onclick=()=>goStep(+el.dataset.go));
+}
+function goStep(n){
+  if(n<1||n>TOTAL)return;
+  S.step=n;
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("show",+p.dataset.step===n));
+  $("crumb").textContent=`STEP ${n} / ${TOTAL}`;$("title").textContent=STEPS[n-1].t;
+  $("btnPrev").style.visibility=n===1?"hidden":"visible";
+  $("btnNext").style.display=n===TOTAL?"none":"inline-flex";
+  if(n===2)renderFields();
+  if(n===3)renderSum();
+  if(n===TOTAL)renderConfirm();
+  renderNav();
+}
+
+/* 步骤1：文件+子表 */
+const drop=$("drop"),fileInput=$("file");
+drop.onclick=()=>fileInput.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add("over")};
+drop.ondragleave=()=>drop.classList.remove("over");
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");if(e.dataTransfer.files[0]){fileInput.files=e.dataTransfer.files;upload()}};
+fileInput.onchange=upload;
+async function upload(){
+  const f=fileInput.files[0];if(!f)return;
+  $("dropBig").innerHTML='<span class="spinner" style="border-color:#bfe6e1;border-top-color:#0f9d8f"></span> 正在读取子表与字段…';
+  const fd=new FormData();fd.append("file",f);
+  try{
+    const r=await fetch("/api/inspect",{method:"POST",body:fd});const j=await r.json();
+    if(!j.ok)throw new Error(j.msg||"读取失败");
+    S.data=j;S.sheets=j.sheets[0]?[j.sheets[0].name]:[];S.srcName="来源";S.srcMap={};S.includeDetail=true;syncOutMode();initCfg();
+    $("dropBig").textContent="点击重新选择，或拖拽替换文件";
+    $("fileInfo").innerHTML=`<div class="file-pick"><div class="fi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" fill="#dff1ef"/><path d="M14 3v4h4" stroke="#0f9d8f" stroke-width="1.6"/></svg></div><div><div class="fn">${esc(j.filename)}</div><div class="fs">${j.sheets.length} 个子表 · 读取成功</div></div><button class="linkbtn" id="repick">重新选择</button></div>`;
+    $("repick").onclick=()=>fileInput.click();
+    $("sheetWrap").style.display="block";renderSheets();
+  }catch(e){$("dropBig").textContent=e.message+"（点击重试）";S.data=null}
+}
+function pickedSheets(){return S.data?S.data.sheets.filter(s=>S.sheets.includes(s.name)):[]}
+/* 选中多张子表时的合并视图：列名并集 + 新增「来源」列 */
+function mergedView(){
+  const ps=pickedSheets();if(!ps.length)return null;
+  const columns=[],colMeta={};
+  ps.forEach(s=>(s.columns||[]).forEach(c=>{
+    const m=s.colMeta&&s.colMeta[c];
+    if(!columns.includes(c)){columns.push(c);colMeta[c]=m?{...m}:{numeric:false,measure:false}}
+    else if(m){colMeta[c].numeric=colMeta[c].numeric||!!m.numeric;colMeta[c].measure=colMeta[c].measure||!!m.measure}
+  }));
+  if(ps.length>1){const sc=S.srcName||"来源";if(!columns.includes(sc)){columns.push(sc);colMeta[sc]={numeric:false,measure:false}}}
+  return {name:ps.map(s=>s.name).join(" + "),columns,colMeta};
+}
+function renderSheets(){
+  const checkSvg='<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  $("sheetGrid").innerHTML=S.data.sheets.map(s=>{
+    const on=S.sheets.includes(s.name),idx=S.sheets.indexOf(s.name);
+    return `<div class="sheet-opt ${on?"sel":""}" data-sheet="${esc(s.name)}">
+      <div class="sn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" fill="#e7f6f4" stroke="#0f9d8f" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#0b7d72" stroke-width="1.5" stroke-linecap="round"/></svg>${esc(s.name)}<span class="tick">${S.sheets.length>1?(idx+1):checkSvg}</span></div>
+      <div class="sc">${s.columns.length} 个字段${on?" · 已选":""}</div></div>`;
+  }).join("");
+  document.querySelectorAll(".sheet-opt").forEach(el=>el.onclick=()=>{
+    const n=el.dataset.sheet;
+    if(S.sheets.includes(n)){S.sheets=S.sheets.filter(x=>x!==n);delete S.srcMap[n]}
+    else{S.sheets.push(n);S.srcMap[n]=S.srcMap[n]||n}
+    initCfg();renderSheets();
+  });
+  const tip=$("mergeTip");
+  if(!tip)return;
+  if(S.sheets.length<2){tip.style.display="none";return}
+  tip.style.display="block";
+  tip.innerHTML=`合并 <b>${S.sheets.length}</b> 张子表，并新增一列标记每行来源（列名和标记值都可直接改）：
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px">
+      <span style="font-weight:700">来源列名</span>
+      <input id="srcNameInput" type="text" value="${esc(S.srcName)}" style="padding:6px 10px;border:1px solid #9fd6d0;border-radius:8px;width:160px;font-size:13px">
+    </div>
+    <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:7px 16px">
+      ${S.sheets.map(s=>`<div style="display:flex;align-items:center;gap:7px;font-size:12.5px">
+        <span style="min-width:56px;font-weight:700">${esc(s)}</span><span style="color:var(--faint)">标记为</span>
+        <input class="srcval" data-sheet="${esc(s)}" type="text" value="${esc(S.srcMap[s]||s)}" style="flex:1;min-width:0;padding:6px 9px;border:1px solid #9fd6d0;border-radius:8px;font-size:13px"></div>`).join("")}
+    </div>`;
+  $("srcNameInput").oninput=e=>{
+    const oldN=S.srcName,newN=e.target.value.trim()||"来源";
+    if(oldN!==newN){  // 改名时迁移已选状态，不重渲染以免输入失焦
+      if(S.cfg[oldN]){S.cfg[newN]=S.cfg[oldN];delete S.cfg[oldN]}
+      if(S.role[oldN]){S.role[newN]=S.role[oldN];delete S.role[oldN]}
+      if(S.split===oldN)S.split=newN;
+      S.srcName=newN;
+    }
+  };
+  document.querySelectorAll(".srcval").forEach(inp=>inp.oninput=e=>S.srcMap[e.target.dataset.sheet]=e.target.value);
+}
+function initCfg(){
+  const sh=mergedView();S.cfg={};S.role={};
+  const multi=pickedSheets().length>1;
+  (sh?sh.columns:[]).forEach(c=>{
+    const measure=isMeasure(c),isSrc=(multi&&c===(S.srcName||"来源"));
+    S.cfg[c]={keep:isSrc,mask:""};  // 多表合并时「来源」列默认自动保留
+    S.role[c]={kind:measure?"sum":(isSrc?"none":"group"),label:measure?defaultLabel(c,"sum"):""};
+  });
+  S.split="";
+  S.sumInited=false;S.pvMarket="";S.sumTouched=false;
+}
+
+/* 步骤2：字段卡片 + 脱敏区 + 拆分列 */
+function kept(){return Object.keys(S.cfg).filter(c=>S.cfg[c].keep)}
+function isMeasure(c){const sh=mergedView(),m=sh&&sh.colMeta&&sh.colMeta[c];return !!(m&&m.measure)}
+function renderFields(){
+  const sh=mergedView();
+  $("fieldGrid").innerHTML=sh?sh.columns.map((c,i)=>{
+    const cf=S.cfg[c]||{keep:false,mask:""};S.cfg[c]=cf;
+    const tags=[];const isSrcNow=(pickedSheets().length>1&&c===(S.srcName||"来源"));if(isSrcNow)tags.push('<span class="mini-tag" style="background:var(--primary-soft);color:var(--primary-d)">合并生成</span>');if(isMeasure(c))tags.push('<span class="mini-tag num">数值</span>');if(cf.mask)tags.push('<span class="mini-tag mask">已脱敏</span>');
+    return `<div class="fcard ${cf.keep?"on":""}" data-c="${esc(c)}">
+      <div class="fk"><input type="checkbox" class="keep" ${cf.keep?"checked":""}><span>${esc(c)}</span></div>
+      <div class="fmeta">${tags.join("")||'<span class="mini-tag">列 '+(i+1)+'</span>'}</div>
+    </div>`;
+  }).join(""):'<span style="color:var(--faint);font-size:13px">请先在第 1 步选择文件和子表</span>';
+  document.querySelectorAll(".fcard").forEach(card=>{
+    const c=card.dataset.c,cf=S.cfg[c];
+    card.onclick=e=>{if(e.target.tagName==="INPUT")return;cf.keep=!cf.keep;if(!cf.keep)cf.mask="";if(S.split===c&&!cf.keep)S.split="";renderFields()};
+    card.querySelector(".keep").onchange=e=>{cf.keep=e.target.checked;if(!cf.keep)cf.mask="";if(S.split===c&&!cf.keep)S.split="";renderFields()};
+  });
+  const ks=kept();
+  $("keepStat").textContent=ks.length?`已保留 ${ks.length} 个字段`:"尚未勾选字段";
+  // 拆分列下拉
+  $("splitSel").innerHTML='<option value="">— 请选择拆分列 —</option>'+ks.map(c=>`<option value="${esc(c)}"${S.split===c?" selected":""}>${esc(c)}</option>`).join("");
+  $("splitSel").onchange=e=>S.split=e.target.value;
+  // 脱敏规则区
+  if(!ks.length){$("maskGrid").innerHTML='<span style="font-size:12.5px;color:var(--faint)">勾选保留字段后，可在此设置脱敏</span>'}
+  else{
+    $("maskGrid").innerHTML=ks.map(c=>{
+      const cf=S.cfg[c];
+      return `<div class="mask-item" data-c="${esc(c)}"><span class="mn" title="${esc(c)}">${esc(c)}</span>
+        <select class="msk" data-c="${esc(c)}">
+          <option value="">不脱敏</option>
+          <option value="phone"${cf.mask==="phone"?" selected":""}>手机号</option>
+          <option value="idcard"${cf.mask==="idcard"?" selected":""}>身份证</option>
+          <option value="address"${cf.mask==="address"?" selected":""}>详细地址(到区县)</option>
+          <option value="name"${cf.mask==="name"?" selected":""}>姓名(留姓)</option>
+          <option value="keep_ab"${cf.mask==="keep_ab"?" selected":""}>保留前/后几位…</option>
+          <option value="replace"${cf.mask==="replace"?" selected":""}>替换为文字…</option>
+        </select><span class="opt-extra">${maskExtra(cf)}</span></div>`;
+    }).join("");
+    document.querySelectorAll(".msk").forEach(sel=>sel.onchange=e=>{
+      const cf=S.cfg[sel.dataset.c];cf.mask=e.target.value;
+      if(cf.mask==="keep_ab"&&cf.a==null){cf.a=3;cf.b=4}if(cf.mask==="replace"&&!cf.text){cf.text="***"}
+      renderFields();
+    });
+    document.querySelectorAll(".opt-extra input").forEach(inp=>inp.oninput=e=>S.cfg[inp.closest(".mask-item").dataset.c][e.target.dataset.k]=e.target.value);
+  }
+}
+function maskExtra(cf){
+  if(cf.mask==="keep_ab")return `前<input type="text" data-k="a" value="${cf.a??3}">后<input type="text" data-k="b" value="${cf.b??4}">`;
+  if(cf.mask==="replace")return `替换<input type="text" data-k="text" value="${esc(cf.text??"***")}">`;
+  return "";
+}
+$("allKeep").onclick=()=>{Object.values(S.cfg).forEach(c=>c.keep=true);renderFields()};
+$("noneKeep").onclick=()=>{Object.values(S.cfg).forEach(c=>{c.keep=false;c.mask=""});S.split="";renderFields()};
+
+/* 步骤3：汇总（字段后下拉） */
+function defaultLabel(c,kind){
+  if(kind==="sum")return /合计|总额/.test(c)?c:c+"合计";
+  if(kind==="cdistinct"){if(/订单/.test(c))return "订单数";return c.replace(/编号|编码|单号|号|ID|id/g,"")+"数"}
+  if(kind==="crows")return "记录数";return "";
+}
+const KIND_NAME={none:"不参与",group:"分组维度",sum:"求和",cdistinct:"计数（去重）",crows:"计数（行数）"};
+function recommendSum(){
+  const sh=mergedView();
+  kept().forEach(c=>{
+    const r=S.role[c];const m=sh&&sh.colMeta&&sh.colMeta[c];
+    const isNum=!!(m&&m.measure);
+    if(isNum){r.kind="sum";r.label=defaultLabel(c,"sum")}
+    else if(/订单|单号|编号|编码|流水|工号|学号|卡号|账号|手机|电话|身份证/i.test(c)){r.kind="cdistinct";r.label=defaultLabel(c,"cdistinct")}
+    else{r.kind="none";r.label=""}
+  });
+  // 推荐主维度：除拆分列/来源列外，文本列中取值数∈[2,50] 且最多的一列
+  let best=null,bestU=1;
+  kept().forEach(c=>{
+    const r=S.role[c];
+    if(r.kind!=="none"||c===S.split||(S.sheets.length>1&&c===(S.srcName||"来源")))return;
+    const m=sh&&sh.colMeta&&sh.colMeta[c];
+    if(!m||m.measure)return;
+    const u=m.unique||0;
+    if(u>=2&&u<=50&&u>bestU){bestU=u;best=c}
+  });
+  if(best){S.role[best].kind="group";S.role[best].label=""}
+  const sl=kept().find(c=>S.role[c]&&S.role[c].kind==="sum");
+  if(sl){S.sortLabel=S.role[sl].label||defaultLabel(sl,"sum");S.sortDesc=true}
+}
+function renderSum(){
+  $("sumEnabled").checked=S.sumOn;$("sumConfig").style.display=S.sumOn?"block":"none";
+  const sh=mergedView();
+  if(!S.sumInited){if(kept().length){recommendSum();S.sumInited=true}}
+  // 新字段补默认角色（保留字段变化后）
+  kept().forEach(c=>{const r=S.role[c];if(!r)return;
+    if(!r.kind||r.kind===""){const m=sh&&sh.colMeta&&sh.colMeta[c];r.kind=(m&&m.measure)?"sum":"none";r.label=r.kind==="sum"?defaultLabel(c,"sum"):""}
+  });
+  const isSrc=c=>S.sheets.length>1&&c===(S.srcName||"来源");
+  $("dimHint").innerHTML=S.split?`拆分列 <b>${esc(S.split)}</b> 按值各拆一份，不参与分组`:"<b>提示：</b>请先在第 2 步选择拆分列，此处才能预览";
+  // 文本维度区
+  const textCols=kept().filter(c=>!isMeasure(c)&&c!==S.split&&!isSrc(c));
+  $("sumGroupGrid").innerHTML=textCols.length?textCols.map(c=>{
+    const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
+    const u=sh&&sh.colMeta&&sh.colMeta[c]?sh.colMeta[c].unique:0;
+    const on=r.kind!=="none";
+    const gDefName=r.kind==="group"?c:defaultLabel(c,r.kind);
+    return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}">
+      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}</div>
+      <select class="gkind" style="width:100%">
+        <option value="group"${r.kind==="group"?" selected":""}>分组维度</option>
+        <option value="cdistinct"${r.kind==="cdistinct"?" selected":""}>计数（去重）</option>
+        <option value="crows"${r.kind==="crows"?" selected":""}>计数（行数）</option>
+        <option value="none"${r.kind==="none"?" selected":""}>不参与</option>
+      </select>
+      ${r.kind!=="none"?`<input type="text" class="glabel" placeholder="输出列名（可改）" value="${esc(r.label||gDefName)}" style="width:100%;margin-top:6px;padding:6px 9px;border:1px solid #cfdcd9;border-radius:8px;font-size:12.5px">`:""}</div>`;
+  }).join(""):'<span style="color:var(--faint);font-size:12.5px">无可分组的文本字段</span>';
+  // 数值指标区
+  const numCols=kept().filter(c=>isMeasure(c));
+  $("sumMetricBody").innerHTML=numCols.length?numCols.map(c=>{
+    const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
+    const on=r.kind!=="none";
+    const need=on&&r.kind!=="group";
+    const opts=[["sum","求和"],["cdistinct","计数（去重）"],["crows","计数（行数）"],["none","不参与"]];
+    return `<tr data-c="${esc(c)}" class="${on?"masked":""}">
+      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span></div></td>
+      <td><select class="mkind" style="min-width:108px">${opts.map(([v,t])=>`<option value="${v}"${r.kind===v?" selected":""}>${t}</option>`).join("")}</select></td>
+      <td>${need?`<input type="text" class="rlabel" style="width:150px;padding:7px 10px;border:1px solid #cfdcd9;border-radius:9px" value="${esc(r.label||defaultLabel(c,r.kind))}">`:'<span style="color:var(--faint)">—</span>'}</td>
+    </tr>`;
+  }).join(""):'<tr><td colspan="3" style="color:var(--faint)">无可求和的数值字段（手机号等编号列已排除）</td></tr>';
+  // 事件绑定
+  document.querySelectorAll(".gcard").forEach(card=>{
+    const c=card.dataset.c,r=S.role[c];
+    card.querySelector(".gchk").onchange=e=>{r.kind=e.target.checked?(r.kind==="none"?"group":r.kind):"none";renderSum()};
+    card.querySelector(".gkind").onchange=e=>{r.kind=e.target.value;renderSum()};
+    const gl=card.querySelector(".glabel");
+    if(gl)gl.oninput=e=>{const v=e.target.value;r.label=(r.kind==="group"&&v===c)?"":v;rebuildSort();refreshPreview()};
+  });
+  document.querySelectorAll("#sumMetricBody tr").forEach(row=>{
+    const c=row.dataset.c,r=S.role[c];if(!r)return;
+    row.querySelector(".mchk").onchange=e=>{r.kind=e.target.checked?(r.kind==="none"?"sum":r.kind):"none";renderSum()};
+    row.querySelector(".mkind").onchange=e=>{r.kind=e.target.value;renderSum()};
+    const lab=row.querySelector(".rlabel");if(lab)lab.oninput=e=>{r.label=e.target.value;rebuildSort();refreshPreview()};
+  });
+  rebuildSort();
+  refreshPreview();
+}
+function refreshPreview(){
+  if(!S.sumOn){$("pvMarket").innerHTML="";$("pvThead").innerHTML="";$("pvTbody").innerHTML='<tr><td style="color:var(--faint);text-align:center;padding:22px">汇总未启用</td></tr>';return}
+  const sc=sumConf();
+  if(!S.data||!S.split){$("pvMarket").innerHTML="";$("pvThead").innerHTML="";$("pvTbody").innerHTML='<tr><td style="color:var(--faint);text-align:center;padding:22px">请先在第 1、2 步选择文件与拆分列</td></tr>';return}
+  if(!sc.sums.length&&!sc.counts.length){$("pvMarket").innerHTML="";$("pvThead").innerHTML="";$("pvTbody").innerHTML='<tr><td style="color:var(--faint);text-align:center;padding:22px">请选择至少一个计数或求和字段（不选分组时显示整表一行总计）</td></tr>';return}
+  clearTimeout(S.pvTimer);
+  S.pvTimer=setTimeout(async()=>{
+    $("pvTbody").innerHTML='<tr><td style="color:var(--faint);text-align:center;padding:22px"><span class="spinner" style="border-color:#bfe6e1;border-top-color:#0f9d8f"></span> 计算中…</td></tr>';
+    const payload={file_id:S.data.file_id,sheets:S.sheets,split_column:S.split,market:S.pvMarket||"",summary:sc,source_col:S.srcName,source_map:S.srcMap};
+    try{
+      const r=await fetch("/api/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const j=await r.json();
+      if(j.ok){
+        S.pvMarket=j.market;
+        $("pvMarket").innerHTML=j.markets.map(m=>`<option value="${esc(m.value)}"${m.value===j.market?" selected":""}>${esc(m.value)}（${m.rows} 条）</option>`).join("");
+        $("pvMarket").onchange=e=>{S.pvMarket=e.target.value;refreshPreview()};
+        if(j.columns.length){
+          $("pvThead").innerHTML="<tr>"+j.columns.map(c=>`<th>${esc(c)}</th>`).join("")+"</tr>";
+          $("pvTbody").innerHTML=j.data.map(row=>{
+            const total=String(row[0]||"").trim()==="合计";
+            return `<tr${total?' style="font-weight:700;background:#f2faf8"':""}>${row.map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`;
+          }).join("");
+        }else{
+          $("pvThead").innerHTML="";$("pvTbody").innerHTML='<tr><td style="color:var(--faint);text-align:center;padding:22px">该市场暂无汇总数据</td></tr>';
+        }
+      }else{$("pvThead").innerHTML="";$("pvTbody").innerHTML=`<tr><td style="color:var(--faint);text-align:center;padding:22px">${esc(j.msg||"预览失败")}</td></tr>`}
+    }catch(e){$("pvThead").innerHTML="";$("pvTbody").innerHTML=`<tr><td style="color:var(--faint);text-align:center;padding:22px">${esc(e.message)}</td></tr>`}
+  },260);
+}
+function metricLabels(){
+  const labs=[];kept().forEach(c=>{const r=S.role[c];if(!r||r.kind==="none")return;
+    if(r.kind==="group"){const gl=r.label||c;labs.push({v:gl,t:"按 "+gl})}
+    else{const lab=r.label||defaultLabel(c,r.kind);const tag=r.kind==="sum"?"（求和）":r.kind==="cdistinct"?"（去重计数）":"（行数）";labs.push({v:lab,t:lab+tag})}});
+  return labs;
+}
+function rebuildSort(){
+  const labs=metricLabels(),cur=S.sortLabel;
+  $("sumSort").innerHTML=labs.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+  if(labs.length){S.sortLabel=labs.some(o=>o.v===cur)?cur:labs[0].value;$("sumSort").value=S.sortLabel}
+  $("sumOrder").value=S.sortDesc===false?"asc":"desc";
+}
+$("sumSort").onchange=e=>{S.sortLabel=e.target.value;refreshPreview()};
+$("sumOrder").onchange=e=>{S.sortDesc=(e.target.value==="desc");refreshPreview()};
+function syncOutMode(){document.querySelectorAll('input[name=outMode]').forEach(r=>r.checked=(r.value===(S.includeDetail?"both":"sumonly")))}
+document.querySelectorAll('input[name=outMode]').forEach(r=>r.onchange=e=>{S.includeDetail=e.target.value==="both"});
+$("sumEnabled").onchange=e=>{S.sumOn=e.target.checked;$("sumConfig").style.display=S.sumOn?"block":"none";if(!S.sumOn){S.includeDetail=true;syncOutMode()}refreshPreview()};
+$("autoSum").onclick=()=>{recommendSum();renderSum()};
+
+/* 步骤4 */
+$("suffix").oninput=e=>{S.suffix=e.target.value;$("pvSuffix").textContent=S.suffix};
+/* 步骤5 */
+$("browse").onclick=async()=>{const b=$("browse");b.textContent="请在弹窗选择…";try{const r=await fetch("/api/browse_folder",{method:"POST"});const j=await r.json();if(j.ok){$("outdir").value=j.path;S.outdir=j.path}}finally{b.textContent="浏览…"}};
+$("outdir").oninput=e=>S.outdir=e.target.value;
+
+/* 步骤6 */
+function masked(){return Object.keys(S.cfg).filter(c=>S.cfg[c].keep&&S.cfg[c].mask)}
+function ruleText(c){const cf=S.cfg[c];if(cf.mask==="keep_ab")return `保留前${cf.a||0}后${cf.b||0}位`;if(cf.mask==="replace")return `替换为“${cf.text||"***"}”`;return RULE_LABEL[cf.mask]||cf.mask}
+function sumConf(){
+  if(!S.sumOn)return{enabled:false};
+  const groups=[],sums=[],counts=[];
+  kept().forEach(c=>{const r=S.role[c];if(!r)return;
+    if(r.kind==="group")groups.push({col:c,label:(r.label||"").trim()});
+    else if(r.kind==="sum")sums.push({col:c,label:(r.label||defaultLabel(c,"sum")).trim()});
+    else if(r.kind==="cdistinct"||r.kind==="crows")counts.push({col:c,label:(r.label||defaultLabel(c,r.kind)).trim(),distinct:r.kind==="cdistinct"});});
+  return{enabled:true,groups,sums,counts,sort_label:S.sortLabel,sort_desc:S.sortDesc};
+}
+function renderConfirm(){
+  const k=kept(),m=masked(),sc=sumConf();
+  let sumLine="<span style='color:var(--faint)'>不生成汇总</span>";
+  if(sc.enabled){const p=[];if(sc.groups.length)p.push("按 "+sc.groups.map(g=>g.col).join("、")+" 分组");if(sc.sums.length)p.push("求和："+sc.sums.map(s=>s.label).join("、"));if(sc.counts.length)p.push("计数："+sc.counts.map(c=>c.label+(c.distinct?"(去重)":"(行数)")).join("、"));sumLine=p.join("；")+"；合计在最后"}
+  const row=(a,b)=>`<div class="k">${a}</div><div class="v">${b}</div>`;
+  $("summary").innerHTML=
+    row("源文件",esc(S.data?S.data.filename:"-"))+
+    row(S.sheets.length>1?"合并子表":"子表",esc(S.sheets.join(" + ")||"-"))+
+    row(`保留字段（${k.length}）`,esc(k.join("、")||"-"))+
+    row("拆分列",`<b style="color:var(--primary-d)">${esc(S.split||"-")}</b>`)+
+    row("脱敏字段",m.length?esc(m.map(c=>`${c}：${ruleText(c)}`).join("；")):"<span style='color:var(--faint)'>无</span>")+
+    row("汇总表",sumLine)+
+    row("输出内容",sc.enabled&&!S.includeDetail?"<b>仅汇总 Sheet</b>（不生成明细）":"明细"+(sc.enabled?" + 汇总":""))+
+    row("文件名样式",`<span style="background:var(--primary);color:#fff;font-size:12px;padding:2px 8px;border-radius:6px">${esc(S.split||"值")}</span>${esc(S.suffix)}.xlsx`)+
+    row("输出文件夹",esc(S.outdir||"-"));
+}
+$("run").onclick=async()=>{
+  if(!S.data)return alert("请先在第 1 步选择 Excel 文件");
+  if(!S.sheets.length)return alert("请先在第 1 步选择子表（可多选合并）");
+  if(!kept().length)return alert("请在第 2 步至少勾选一个保留字段");
+  if(!S.split)return alert("请在第 2 步选择“拆分列”");
+  const sc=sumConf();
+  if(S.sumOn){if(!sc.sums.length&&!sc.counts.length)return alert("汇总需至少给一个字段选“求和”或“计数”；分组维度可以不选（不选则只出一行总计）")}
+  if(!S.includeDetail&&!S.sumOn)return alert("“仅汇总”需要先开启汇总开关，或把输出内容改回“明细+汇总”");
+  if(!S.outdir.trim())return alert("请在第 5 步选择输出文件夹");
+  const keep=kept(),mask={};
+  masked().forEach(c=>{const cf=S.cfg[c];const r={type:cf.mask};if(cf.mask==="keep_ab"){r.a=+cf.a||0;r.b=+cf.b||0}if(cf.mask==="replace")r.text=cf.text||"***";mask[c]=r});
+  const payload={file_id:S.data.file_id,sheet:S.sheets[0],sheets:S.sheets,source_col:S.srcName,source_map:S.srcMap,keep_columns:keep,mask,split_column:S.split,suffix:S.suffix,include_detail:S.includeDetail,output_dir:S.outdir.trim(),summary:sc};
+  const btn=$("run");btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 正在拆分，请稍候…';
+  try{
+    const r=await fetch("/api/split",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(j.ok){
+      $("result").innerHTML=`<div class="result-hero ok"><div class="ric"><svg width="38" height="38" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#15a34a"/><path d="M7 12.5l3.5 3.5L17 9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>拆分完成</h3><p>已保存到：${esc(j.output_dir)}</p></div>
+        <div class="stats"><div class="stat"><div class="n">${j.total}</div><div class="l">生成文件</div></div><div class="stat"><div class="n">${j.rows}</div><div class="l">处理行数</div></div><div class="stat"><div class="n">${masked().length}</div><div class="l">脱敏字段</div></div></div>
+        <div class="filelist">${j.groups.map(g=>`<div class="fi-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" fill="#e7f6f4"/><path d="M14 3v4h4" stroke="#0f9d8f" stroke-width="1.5"/></svg>${esc(g.file)}<span class="cnt">${g.rows} 行${g.has_summary?(g.has_detail===false?" · 仅汇总":" · 明细+汇总"):""}</span></div>`).join("")}</div>
+        <div style="margin-top:16px"><button class="btn btn-ghost" id="again" style="width:100%;justify-content:center">再拆一份</button></div>`;
+      $("again").onclick=()=>{fileInput.value="";S.data=null;S.sheets=[];S.srcName="来源";S.srcMap={};S.includeDetail=true;syncOutMode();$("result").innerHTML="";$("fileInfo").innerHTML="";$("sheetWrap").style.display="none";goStep(1)};
+    }else if(j.aborted){
+      $("result").innerHTML=`<div class="result-hero err"><div class="ric"><svg width="38" height="38" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#e03131"/><path d="M12 7v6m0 4h.01" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></div><h3>已中止，未生成文件</h3><p>${esc(j.msg)}</p></div>
+        <div class="alert err">共 ${j.problem_total} 条问题，前 ${(j.problems||[]).length} 条如下，请在原表修正后重新上传：
+          <table><tr><th>位置</th><th>内容</th><th>问题</th></tr>${(j.problems||[]).map(p=>`<tr><td>${p.sheet?esc(p.sheet)+" · ":""}第 ${p.row} 行</td><td>${esc(p.value||"(空)")}</td><td>${esc(p.reason)}</td></tr>`).join("")}</table></div>`;
+    }else{$("result").innerHTML=`<div class="alert err"><b>拆分失败：</b>${esc(j.msg||"未知错误")}</div>`}
+  }catch(e){$("result").innerHTML=`<div class="alert err"><b>请求失败：</b>${esc(e.message)}</div>`}
+  finally{btn.disabled=false;btn.textContent="开始拆分"}
+};
+$("btnPrev").onclick=()=>goStep(S.step-1);
+$("btnNext").onclick=()=>goStep(S.step+1);
+
+/* ---------- 配置模板：保存 / 套用 / 管理 ---------- */
+function tplMsg(t,kind){
+  const el=$("tplMsg");el.textContent=t;el.className="tpl-msg show"+(kind==="warn"?" warn":"");
+  clearTimeout(S.tplMsgT);S.tplMsgT=setTimeout(()=>{el.className="tpl-msg"},6000);
+}
+async function loadTpls(){
+  try{
+    const r=await fetch("/api/templates");const j=await r.json();
+    if(j.ok){S.tpls=j.templates||[];renderTplSel()}
+  }catch(e){}
+}
+function renderTplSel(){
+  $("tplSel").innerHTML='<option value="">— 选择模板 —</option>'+
+    S.tpls.map(t=>`<option value="${esc(t.name)}" title="${esc(t.split||"")} · ${t.keep} 字段 · 更新于 ${esc(t.updated||"")}">${esc(t.name)}${t.summary_on?" · 含汇总":""}</option>`).join("");
+  $("tplSel").value=S.tplCur;
+}
+function collectTplConfig(){
+  const mask={};
+  masked().forEach(c=>{const cf=S.cfg[c];const r={type:cf.mask};if(cf.mask==="keep_ab"){r.a=+cf.a||0;r.b=+cf.b||0}if(cf.mask==="replace")r.text=cf.text||"***";mask[c]=r});
+  return {sheets:S.sheets,source_col:S.srcName,source_map:S.srcMap,keep_columns:kept(),mask,split_column:S.split,suffix:S.suffix,include_detail:S.includeDetail,summary:sumConf()};
+}
+async function saveTpl(){
+  const cfg=collectTplConfig();
+  if(!S.data)return alert("请先在第 1 步选择文件并完成配置，再保存模板");
+  if(!cfg.keep_columns.length)return alert("请先配置好拆分内容（至少勾选一个保留字段）再保存模板");
+  const name=prompt("模板名称：",S.tplCur||"");
+  if(!name||!name.trim())return;
+  try{
+    const r=await fetch("/api/templates/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.trim(),config:cfg})});
+    const j=await r.json();
+    if(j.ok){S.tplCur=j.name;await loadTpls();tplMsg(`已保存模板「${j.name}」`)}
+    else alert(j.msg||"保存失败");
+  }catch(e){alert("保存失败："+e.message)}
+}
+async function applyTpl(){
+  const name=$("tplSel").value;
+  if(!name)return alert("请先在下拉框选择一个模板");
+  if(!S.data)return alert("请先在第 1 步选择文件（模板会按列名套用到当前文件）");
+  const r=await fetch("/api/templates/load",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})});
+  const j=await r.json();
+  if(!j.ok)return alert(j.msg||"加载模板失败");
+  const cfg=j.config||{};
+  const sh=mergedView();const cols=new Set(sh?sh.columns:[]);
+  // 列名校验：模板里有、但当前文件没有的列，跳过并提示
+  const missing=[];
+  (cfg.keep_columns||[]).forEach(c=>{if(!cols.has(c))missing.push(c)});
+  if(cfg.split_column&&!cols.has(cfg.split_column)&&!missing.includes(cfg.split_column))missing.push(cfg.split_column);
+  // 1) 子表
+  S.sheets=(cfg.sheets||[]).filter(s=>S.data.sheets.some(x=>x.name===s));
+  if(!S.sheets.length&&S.data.sheets.length)S.sheets=[S.data.sheets[0].name];
+  S.srcName=cfg.source_col||"来源";S.srcMap=cfg.source_map||{};S.includeDetail=cfg.include_detail!==false;syncOutMode();
+  S.suffix=cfg.suffix||"";
+  // 2) 重置字段/脱敏/拆分列/汇总
+  initCfg();
+  const k=(cfg.keep_columns||[]).filter(c=>cols.has(c));
+  k.forEach(c=>{if(S.cfg[c])S.cfg[c].keep=true});
+  const m=cfg.mask||{};
+  Object.keys(m).forEach(c=>{if(cols.has(c)&&S.cfg[c]){const r=m[c];const cf=S.cfg[c];cf.mask=r.type;if(r.type==="keep_ab"){cf.a=r.a;cf.b=r.b}if(r.type==="replace")cf.text=r.text}});
+  S.split=cols.has(cfg.split_column)?cfg.split_column:"";
+  // 3) 汇总配置套用
+  const sc=cfg.summary||{};
+  S.sumOn=!!sc.enabled;
+  kept().forEach(c=>{const r=S.role[c];if(!r)return;const mm=sh&&sh.colMeta&&sh.colMeta[c];r.kind=(mm&&mm.measure)?"sum":"none";r.label=r.kind==="sum"?defaultLabel(c,"sum"):""});
+  const gset=new Set((sc.groups||[]).map(g=>g.col));
+  const sset=new Set((sc.sums||[]).map(s=>s.col));
+  const cset=new Set((sc.counts||[]).map(c=>c.col));
+  kept().forEach(c=>{const r=S.role[c];if(!r)return;
+    if(gset.has(c)){const gg=(sc.groups||[]).find(x=>x.col===c);r.kind="group";r.label=(gg&&gg.label)||""}
+    else if(sset.has(c)){const s=(sc.sums||[]).find(x=>x.col===c);r.kind="sum";r.label=(s&&s.label)||defaultLabel(c,"sum")}
+    else if(cset.has(c)){const cc=(sc.counts||[]).find(x=>x.col===c);r.kind=(cc&&cc.distinct)?"cdistinct":"crows";r.label=(cc&&cc.label)||defaultLabel(c,r.kind)}
+  });
+  S.sortLabel=sc.sort_label||"";S.sortDesc=sc.sort_desc!==false;
+  S.sumInited=true; // 阻止「进入第3步时自动推荐」覆盖模板配置
+  // 4) 模板分组列缺失时：自动补一个推荐分组维度，避免点拆分被「无分组」拦截
+  let autoGrp=null;
+  if(S.sumOn&&(sc.groups||[]).length&&!kept().some(c=>S.role[c]&&S.role[c].kind==="group")){
+    const sh2=mergedView();
+    let best=null,bestU=1;
+    kept().forEach(c=>{const r=S.role[c];if(!r)return;
+      if(r.kind!=="none"||c===S.split||(S.sheets.length>1&&c===(S.srcName||"来源")))return;
+      const mm=sh2&&sh2.colMeta&&sh2.colMeta[c];
+      if(!mm||mm.measure)return;
+      const u=mm.unique||0;
+      if(u>=2&&u<=50&&u>bestU){bestU=u;best=c}
+    });
+    if(best){S.role[best].kind="group";S.role[best].label="";autoGrp=best}
+  }
+  // 5) 刷新界面
+  $("suffix").value=S.suffix;
+  $("pvSuffix").textContent=S.suffix;
+  renderSheets();renderFields();renderSum();renderConfirm();
+  S.tplCur=name;
+  const tip=missing.length?`模板已套用，但字段「${missing.join("、")}」在当前文件中不存在，已自动跳过`:"模板「"+name+"」已套用，各步骤已自动填好";
+  tplMsg(tip+(autoGrp?`；已自动补选分组维度「${autoGrp}」`:"")+(missing.length?"":"。"),missing.length?"warn":"");
+}
+async function renameTpl(){
+  const name=$("tplSel").value;
+  if(!name)return alert("请先在下拉框选择要重命名的模板");
+  const nn=prompt("新名称：",name);
+  if(!nn||!nn.trim()||nn.trim()===name)return;
+  try{
+    const r=await fetch("/api/templates/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({old_name:name,new_name:nn.trim()})});
+    const j=await r.json();
+    if(j.ok){S.tplCur=j.name;await loadTpls();tplMsg(`已重命名为「${j.name}」`)}
+    else alert(j.msg||"重命名失败");
+  }catch(e){alert("重命名失败："+e.message)}
+}
+async function delTpl(){
+  const name=$("tplSel").value;
+  if(!name)return alert("请先在下拉框选择要删除的模板");
+  if(!confirm(`确定删除模板「${name}」？此操作不可恢复。`))return;
+  try{
+    const r=await fetch("/api/templates/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})});
+    const j=await r.json();
+    if(j.ok){S.tplCur="";await loadTpls();tplMsg(`已删除「${name}」`)}
+    else alert(j.msg||"删除失败");
+  }catch(e){alert("删除失败："+e.message)}
+}
+$("tplSel").onchange=e=>S.tplCur=e.target.value;
+$("tplApply").onclick=applyTpl;
+$("tplSave").onclick=saveTpl;
+$("tplRename").onclick=renameTpl;
+$("tplDel").onclick=delTpl;
+loadTpls();
+renderNav();goStep(1);
+</script>
+</body>
+</html>
