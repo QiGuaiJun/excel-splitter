@@ -220,7 +220,7 @@
       body.innerHTML = `
         <div class="form-row">
           <label>文件夹路径 <span class="hint">本地绝对路径</span></label>
-          <input type="text" id="folderPath" placeholder="例如：D:\数据\8月报表">
+          <input type="text" id="folderPath" placeholder="例如：D:\\数据\\8月报表">
         </div>
         <div class="form-row">
           <label>
