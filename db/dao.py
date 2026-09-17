@@ -152,13 +152,14 @@ class DataSourceDAO(BaseDAO):
 
     @staticmethod
     def update(source_id, **fields):
-        """更新数据源，仅更新传入的非 None 字段。"""
+        """更新数据源。category_id 允许设置为 None（清空分类）。"""
         allowed = {"name", "channel", "category_id", "file_path", "config",
                    "row_count", "col_count", "sheet_names", "status"}
+        nullable = {"category_id"}  # 允许显式设为 NULL 的字段
         sets, params = [], []
         for key, val in fields.items():
-            if key in allowed and val is not None:
-                if key in ("config", "sheet_names"):
+            if key in allowed and (val is not None or key in nullable):
+                if key in ("config", "sheet_names") and val is not None:
                     val = json.dumps(val, ensure_ascii=False)
                 sets.append(f"{key} = %s")
                 params.append(val)
@@ -170,7 +171,7 @@ class DataSourceDAO(BaseDAO):
             with conn.cursor() as cur:
                 cur.execute(sql, params)
                 conn.commit()
-                return cur.rowcount > 0
+                return True  # 执行成功即返回 True（相同值更新也视为成功）
 
     @staticmethod
     def update_collect_result(source_id, row_count, col_count, sheet_names=None, status="ready"):
@@ -216,7 +217,7 @@ class CollectionLogDAO(BaseDAO):
 
     @staticmethod
     def list_by_source(source_id, limit=50):
-        sql = "SELECT * FROM collection_logs WHERE source_id = %s ORDER BY created_at DESC LIMIT %s"
+        sql = "SELECT * FROM collection_logs WHERE source_id = %s ORDER BY created_at DESC, id DESC LIMIT %s"
         with CollectionLogDAO._conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (source_id, limit))
