@@ -318,8 +318,12 @@
         </div>
         <div class="form-row">
           <label>
-            <input type="checkbox" id="folderRecursive" style="width:auto;margin-right:6px"> 递归导入子文件夹
+            <input type="checkbox" id="folderRecursive" style="width:auto;margin-right:6px" onchange="SRC_scanFolder()"> 递归导入子文件夹
           </label>
+        </div>
+        <div class="form-row" id="folderScanWrap" style="display:none">
+          <label>待导入文件 <span id="folderScanCount" class="hint"></span></label>
+          <div class="folder-scan-list" id="folderScanList"></div>
         </div>
         <div class="form-row">
           <label>统一分类 <span class="hint">导入的所有文件归到此分类</span></label>
@@ -346,9 +350,44 @@
       const j = await r.json();
       if(j.ok && j.path){
         $("folderPath").value = j.path;
+        SRC_scanFolder();
       }
     }catch(e){
       toast("选择文件夹失败", "err");
+    }
+  };
+
+  window.SRC_scanFolder = async function(){
+    const path = $("folderPath").value.trim();
+    if(!path){ $("folderScanWrap").style.display = "none"; return; }
+    const recursive = $("folderRecursive").checked;
+    try{
+      const r = await fetch(`/api/scan-folder?path=${encodeURIComponent(path)}&recursive=${recursive}`);
+      const j = await r.json();
+      const wrap = $("folderScanWrap");
+      const list = $("folderScanList");
+      const count = $("folderScanCount");
+      if(j.ok){
+        wrap.style.display = "block";
+        if(j.total > 0){
+          count.textContent = `（共 ${j.total} 个文件）`;
+          list.innerHTML = j.files.map(f => `
+            <div class="folder-scan-item">
+              <span class="fsi-name">${esc(f.relative_path)}</span>
+              <span class="fsi-meta">${f.size_human} · ${f.mtime_str}</span>
+            </div>
+          `).join("");
+        } else {
+          count.textContent = "（未找到文件）";
+          list.innerHTML = `<div class="folder-scan-empty">该文件夹下没有 Excel/CSV 文件</div>`;
+        }
+      } else {
+        wrap.style.display = "block";
+        count.textContent = "";
+        list.innerHTML = `<div class="folder-scan-empty">${esc(j.msg || "扫描失败")}</div>`;
+      }
+    }catch(e){
+      toast("扫描失败", "err");
     }
   };
 

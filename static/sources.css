@@ -186,3 +186,11 @@
 
 /* 数据源卡片上的修改分类按钮 */
 .src-card .sc-actions .btn.cat-btn{color:var(--primary-d)}
+
+/* 文件夹扫描文件列表预览 */
+.folder-scan-list{max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:#fafcfc}
+.folder-scan-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #eef2f1;font-size:13px}
+.folder-scan-item:last-child{border-bottom:none}
+.folder-scan-item .fsi-name{flex:1;word-break:break-all;color:var(--ink)}
+.folder-scan-item .fsi-meta{color:var(--faint);font-size:11.5px;margin-left:12px;flex:none}
+.folder-scan-empty{padding:20px;text-align:center;color:var(--faint);font-size:13px}

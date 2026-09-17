@@ -156,6 +156,58 @@ def collect_excel():
     return jsonify({"ok": True, "data": ds, "duration_ms": duration})
 
 
+def _human_size(size_bytes):
+    """字节数转人类可读格式。"""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+@bp.route("/scan-folder", methods=["GET"])
+def scan_folder():
+    """扫描文件夹下的 Excel/CSV 文件，返回文件列表预览（不导入）。
+
+    Query: path（文件夹路径）, recursive（是否递归，默认 false）
+    """
+    folder_path = (request.args.get("path") or "").strip()
+    recursive = request.args.get("recursive", "false").lower() == "true"
+    if not folder_path or not os.path.isdir(folder_path):
+        return jsonify({"ok": False, "msg": "文件夹路径无效"}), 400
+
+    files = []
+    if recursive:
+        for root, _, fnames in os.walk(folder_path):
+            for fn in fnames:
+                if os.path.splitext(fn)[1].lower() in ALLOWED_EXTS:
+                    fp = os.path.join(root, fn)
+                    stat = os.stat(fp)
+                    files.append({
+                        "name": fn,
+                        "relative_path": os.path.relpath(fp, folder_path),
+                        "size": stat.st_size,
+                        "size_human": _human_size(stat.st_size),
+                        "mtime_str": time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)),
+                    })
+    else:
+        for fn in os.listdir(folder_path):
+            fp = os.path.join(folder_path, fn)
+            if os.path.isfile(fp) and os.path.splitext(fn)[1].lower() in ALLOWED_EXTS:
+                stat = os.stat(fp)
+                files.append({
+                    "name": fn,
+                    "relative_path": fn,
+                    "size": stat.st_size,
+                    "size_human": _human_size(stat.st_size),
+                    "mtime_str": time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)),
+                })
+
+    files.sort(key=lambda x: x["mtime_str"], reverse=True)
+    return jsonify({"ok": True, "files": files, "total": len(files)})
+
+
 @bp.route("/collect/folder", methods=["POST"])
 def collect_folder():
     """批量导入文件夹下的所有 Excel/CSV。
