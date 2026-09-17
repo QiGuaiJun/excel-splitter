@@ -121,3 +121,28 @@
 /* spinner */
 .spinner{display:inline-block;width:18px;height:18px;border:2.5px solid #bfe6e1;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   重构后导航：分组 + 模块 + 子步骤（匹配原型架构）
+   ============================================================ */
+.nav-section{margin-bottom:16px}
+.nav-title{font-size:10.5px;color:#6b8f88;text-transform:uppercase;letter-spacing:1.5px;padding:0 12px;margin-bottom:8px;font-weight:700}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;cursor:pointer;color:#9fc0b9;transition:.15s;position:relative;margin-bottom:2px}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.1);color:#fff}
+.nav-item.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--primary);border-radius:2px}
+.nav-item .nav-icon{font-size:15px;flex:none;width:20px;text-align:center}
+.nav-item .nav-label{font-size:13px;font-weight:600;flex:1}
+.nav-item .nav-soon{font-size:9.5px;background:rgba(255,255,255,.08);color:#7fa39c;padding:2px 6px;border-radius:4px;font-weight:600}
+.nav-item.disabled{opacity:.5}
+.nav-item.disabled:hover{background:transparent;color:#9fc0b9}
+.nav-item .nav-arrow{font-size:9px;transition:.2s;flex:none;opacity:.7}
+.nav-item.collapsed .nav-arrow{transform:rotate(-90deg)}
+.sub-steps{display:flex;flex-direction:column;gap:1px;margin-left:20px;padding-left:12px;border-left:1px solid rgba(255,255,255,.08);margin-top:1px;margin-bottom:6px}
+.sub-steps.collapsed{display:none}
+.sub-step{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;color:#8fb0a9;font-size:12px;transition:.12s}
+.sub-step:hover{background:rgba(255,255,255,.05);color:#fff}
+.sub-step.active{background:rgba(15,157,143,.2);color:#fff;font-weight:600}
+.sub-step .dot{width:17px;height:17px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex:none;color:#cfe3de}
+.sub-step.active .dot{background:var(--primary);color:#fff}
+.sub-step .t{flex:1}

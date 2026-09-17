@@ -147,12 +147,30 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
       <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M15 15l2 2 4-4" stroke="#7fe0d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div><h1>分表脱敏工作台</h1><p>Split · Mask · Summary</p></div>
     </div>
-    <div class="step module-entry" id="navSources" onclick="goSources()">
-      <span class="dot" style="background:var(--primary);color:#fff;font-size:14px">📊</span>
-      <span class="t">数据采集</span>
-    </div>
-    <div class="nav-divider"></div>
-    <nav class="nav" id="nav"></nav>
+    <nav class="nav" id="nav">
+      <div class="nav-section">
+        <div class="nav-title">数据链路</div>
+        <div class="nav-item" id="navSources" onclick="goModule('sources')">
+          <span class="nav-icon">📥</span><span class="nav-label">数据采集</span>
+        </div>
+        <div class="nav-item disabled" onclick="toast('数据清洗模块即将上线')">
+          <span class="nav-icon">🧹</span><span class="nav-label">数据清洗</span><span class="nav-soon">即将上线</span>
+        </div>
+        <div class="nav-item disabled" onclick="toast('数据计算模块即将上线')">
+          <span class="nav-icon">🧮</span><span class="nav-label">数据计算</span><span class="nav-soon">即将上线</span>
+        </div>
+        <div class="nav-item has-sub" id="navDistribute" onclick="toggleDistribute()">
+          <span class="nav-icon">📤</span><span class="nav-label">数据分发</span><span class="nav-arrow" id="distArrow">▾</span>
+        </div>
+        <div class="sub-steps" id="distSubSteps"></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-title">运维</div>
+        <div class="nav-item disabled" onclick="toast('运行历史模块即将上线')">
+          <span class="nav-icon">🕐</span><span class="nav-label">运行历史</span><span class="nav-soon">即将上线</span>
+        </div>
+      </div>
+    </nav>
     <div class="side-foot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="#7fa39c" stroke-width="1.6" stroke-linejoin="round"/></svg><span>本地运行，数据不离开本机</span></div>
   </aside>
 
@@ -362,14 +380,22 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",
 const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},split:"",suffix:"",outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
 
 /* 自由导航：任意步骤可点 */
+let currentModule='distribute';
 function renderNav(){
-  $("nav").innerHTML=STEPS.map((s,i)=>{
-    const n=i+1;return `<div class="step ${n===S.step?"active":""}" data-go="${n}"><span class="dot">${n}</span><span class="t">${s.t}</span></div>`;
-  }).join("");
-  document.querySelectorAll(".step").forEach(el=>el.onclick=()=>goStep(+el.dataset.go));
+  const sub=$("distSubSteps");
+  if(sub){
+    sub.innerHTML=STEPS.map((s,i)=>{
+      const n=i+1;return `<div class="sub-step ${n===S.step&&currentModule==='distribute'?'active':''}" data-go="${n}"><span class="dot">${n}</span><span class="t">${s.t}</span></div>`;
+    }).join("");
+    sub.querySelectorAll(".sub-step").forEach(el=>el.onclick=()=>goStep(+el.dataset.go));
+  }
+  document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
+  if(currentModule==='sources')$("navSources")&&$("navSources").classList.add("active");
+  if(currentModule==='distribute')$("navDistribute")&&$("navDistribute").classList.add("active");
 }
 function goStep(n){
   if(n<1||n>TOTAL)return;
+  currentModule='distribute';
   S.step=n;
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("show",+p.dataset.step===n));
   $("crumb").textContent=`STEP ${n} / ${TOTAL}`;$("title").textContent=STEPS[n-1].t;

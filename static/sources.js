@@ -30,23 +30,40 @@
   function hideModal(id){ $(id).classList.remove("show"); }
   function closeModalOnMask(e){ if(e.target.classList.contains("modal-mask")) e.target.classList.remove("show"); }
 
-  /* ---------- 切换到数据源面板 ---------- */
-  window.goSources = function(){
-    if(typeof S !== "undefined"){ S.step = 0; }
+  /* ---------- 模块切换（匹配原型导航架构） ---------- */
+  window.goModule = function(mod){
+    if(typeof currentModule !== "undefined") currentModule = mod;
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("show"));
-    const panel = document.querySelector('[data-module="sources"]');
-    if(panel) panel.classList.add("show");
-    const crumb = $("crumb"), title = $("title");
-    if(crumb) crumb.textContent = "数据采集";
-    if(title) title.textContent = "数据源管理中心";
-    const prev = $("btnPrev"), next = $("btnNext");
-    if(prev) prev.style.visibility = "hidden";
-    if(next) next.style.display = "none";
-    // 导航高亮
-    document.querySelectorAll(".step").forEach(s=>s.classList.remove("active"));
-    const navS = $("navSources");
-    if(navS) navS.classList.add("active");
-    loadAll();
+    if(mod === "sources"){
+      const panel = document.querySelector('[data-module="sources"]');
+      if(panel) panel.classList.add("show");
+      const crumb = $("crumb"), title = $("title");
+      if(crumb) crumb.textContent = "数据采集";
+      if(title) title.textContent = "数据源管理中心";
+      const prev = $("btnPrev"), next = $("btnNext");
+      if(prev) prev.style.visibility = "hidden";
+      if(next) next.style.display = "none";
+      loadAll();
+    }
+    document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
+    if(mod === "sources") $("navSources")?.classList.add("active");
+    if(mod === "distribute") $("navDistribute")?.classList.add("active");
+  };
+  window.goSources = function(){ goModule("sources"); };
+
+  /* 分发模块展开/折叠 */
+  window.toggleDistribute = function(){
+    const sub = $("distSubSteps"), arrow = $("distArrow"), item = $("navDistribute");
+    if(sub.classList.contains("collapsed")){
+      sub.classList.remove("collapsed"); item.classList.remove("collapsed");
+      if(arrow) arrow.textContent = "▾";
+    } else {
+      sub.classList.add("collapsed"); item.classList.add("collapsed");
+      if(arrow) arrow.textContent = "▸";
+    }
+    if(typeof currentModule !== "undefined" && currentModule !== "distribute" && typeof goStep === "function"){
+      goStep(1);
+    }
   };
 
   /* ---------- 加载 ---------- */
