@@ -15,6 +15,9 @@ import traceback
 import pandas as pd
 from flask import Flask, request, jsonify, render_template
 
+from api.sources import bp as sources_bp
+from api.collect import bp as collect_bp
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -22,6 +25,9 @@ CONFIG_DIR = os.path.join(BASE_DIR, "configs")  # 保存的拆分配置模板（
 os.makedirs(CONFIG_DIR, exist_ok=True)
 
 app = Flask(__name__)
+
+app.register_blueprint(sources_bp, url_prefix="/api")
+app.register_blueprint(collect_bp, url_prefix="/api")
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 最大 512MB
 
 _tk_lock = threading.Lock()
