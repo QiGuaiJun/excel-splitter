@@ -138,6 +138,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:10px}.brand{border:none;padding:0 12px 0 0}.nav{flex-direction:row;margin:0}.step .d,.side-foot{display:none}.stage,.topbar,.footer{padding-left:18px;padding-right:18px}.summary{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="/static/sources.css">
 </head>
 <body>
 <div class="app">
@@ -146,6 +147,11 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
       <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M15 15l2 2 4-4" stroke="#7fe0d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div><h1>分表脱敏工作台</h1><p>Split · Mask · Summary</p></div>
     </div>
+    <div class="step module-entry" id="navSources" onclick="goSources()">
+      <span class="dot" style="background:var(--primary);color:#fff;font-size:14px">📊</span>
+      <span class="t">数据采集</span>
+    </div>
+    <div class="nav-divider"></div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="#7fa39c" stroke-width="1.6" stroke-linejoin="round"/></svg><span>本地运行，数据不离开本机</span></div>
   </aside>
@@ -167,6 +173,30 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
     </div>
 
     <div class="stage">
+      <section class="panel" data-module="sources">
+        <div class="src-stats" id="srcStats"></div>
+        <div class="src-cats" id="srcCats"></div>
+        <div class="src-tools">
+          <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#5d726d" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="#5d726d" stroke-width="2" stroke-linecap="round"/></svg>
+            <input type="text" id="srcSearch" placeholder="搜索数据源名称..." oninput="SRC_search(this.value)">
+          </div>
+          <button class="btn btn-ghost" onclick="SRC_openCatManager()">管理分类</button>
+          <div class="spacer"></div>
+          <div style="position:relative">
+            <button class="btn btn-primary" onclick="SRC_toggleAddMenu()">+ 新增数据源</button>
+            <div class="add-menu" id="addMenu" style="display:none">
+              <div onclick="SRC_openAdd('excel')">📊 Excel 文件上传</div>
+              <div onclick="SRC_openAdd('folder')">📁 文件夹批量导入</div>
+              <div class="disabled">🗄️ 数据库连接（待接入）</div>
+              <div class="disabled">🕷️ 代码爬取（待接入）</div>
+            </div>
+          </div>
+        </div>
+        <div class="src-list" id="srcList">
+          <div class="empty-state">加载中...</div>
+        </div>
+      </section>
       <!-- 1 文件+子表 -->
       <section class="panel show" data-step="1">
         <div class="card">
@@ -815,5 +845,52 @@ $("tplDel").onclick=delTpl;
 loadTpls();
 renderNav();goStep(1);
 </script>
+<!-- 新增数据源弹窗 -->
+<div class="modal-mask" id="addModal">
+  <div class="modal">
+    <div class="modal-head"><h3>新增数据源</h3><span class="close" onclick="hideModal('addModal')">×</span></div>
+    <div class="modal-body">
+      <div class="channel-picker" id="addChannelPicker"></div>
+      <div id="addFormBody"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="hideModal('addModal')">取消</button>
+      <button class="btn btn-primary" id="addSubmitBtn" onclick="SRC_submitAdd()">开始采集</button>
+    </div>
+  </div>
+</div>
+
+<!-- 数据预览弹窗 -->
+<div class="modal-mask" id="previewModal">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h3 id="previewTitle">数据预览</h3>
+      <select id="previewSheetSel" style="margin-left:12px"></select>
+      <span class="close" onclick="hideModal('previewModal')">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="preview-meta" id="previewMeta"></div>
+      <div id="previewBody"></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="hideModal('previewModal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- 分类管理弹窗 -->
+<div class="modal-mask" id="catModal">
+  <div class="modal">
+    <div class="modal-head"><h3>分类管理</h3><span class="close" onclick="hideModal('catModal')">×</span></div>
+    <div class="modal-body">
+      <div class="cat-list" id="catList"></div>
+      <div class="cat-add-row">
+        <input type="text" id="newCatName" placeholder="输入新分类名称..." onkeydown="if(event.key==='Enter')SRC_addCat()">
+        <button class="btn btn-primary" onclick="SRC_addCat()">添加</button>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="hideModal('catModal')">关闭</button></div>
+  </div>
+</div>
+
+<script src="/static/sources.js"></script>
 </body>
 </html>
