@@ -43,7 +43,7 @@ rows = list(sm.iter_rows(values_only=True))
 assert rows[0] == ("顾问姓名", "订单数", "金额合计"), rows[0]  # 分组列已改名
 assert rows[1] == ("王顾问", 2, 350), rows[1]                    # 金额降序王在前
 assert rows[2] == ("李顾问", 1, 30), rows[2]
-assert rows[3][0] in (None, "") and rows[3][1] == 3 and rows[3][2] == 380, rows[3]
+assert rows[3][0] == "合计" and rows[3][1] == 3 and rows[3][2] == 380, rows[3]
 
 # B: 默认明细+汇总
 fb = run("both", True, [{"col": "健康顾问"}])

@@ -11,6 +11,11 @@ uploads/
 # ---- 运行 / 测试临时输出 ----
 _*/
 *.log
+test_sum*.xlsx
+test_sum_out*/
+_*.xlsx
+test_dirty.xlsx
+test_normal.xlsx
 
 # ---- 系统 / 编辑器 ----
 Thumbs.db

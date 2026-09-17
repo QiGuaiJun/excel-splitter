@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """汇总功能自测：去重计数 / 求和 / 合计 / 排序 / 双Sheet / 与脱敏共存"""
-import os, sys, shutil
+import os, sys, shutil, re
 from io import BytesIO
 import pandas as pd
 
@@ -58,7 +58,9 @@ check("含两个Sheet(明细/汇总)", xl.sheet_names==["明细","汇总"], str(
 xl.close()
 
 detail = pd.read_excel(path, sheet_name="明细", dtype=str)
-check("明细手机号已脱敏", detail["手机号"].iloc[0]=="138****5678", str(detail["手机号"].iloc[0]))
+phones = detail["手机号"].astype(str).tolist()
+check("明细手机号全部脱敏(中4位打星)", all(re.fullmatch(r"\d{3}\*{4}\d{4}", x) for x in phones), str(phones))
+check("脱敏值正确(含138****5678)", "138****5678" in phones, str(phones))
 
 summ = pd.read_excel(path, sheet_name="汇总", dtype=str)
 check("汇总列名正确", list(summ.columns)==["健康顾问","订单数","金额合计"], str(list(summ.columns)))

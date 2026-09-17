@@ -385,8 +385,8 @@ def build_summary(sub: pd.DataFrame, scfg: dict):
         ).reset_index(drop=True)
 
     total = _whole_row(work)
-    for g in gcols:
-        total[g] = ""
+    for _gi, g in enumerate(gcols):
+        total[g] = "合计" if _gi == 0 else ""
     res = pd.concat([res, pd.DataFrame([total])], ignore_index=True)
     res = res[gcols + metric_cols].rename(columns=galias)
     return res
