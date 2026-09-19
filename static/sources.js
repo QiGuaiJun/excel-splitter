@@ -205,6 +205,38 @@
   window.SRC_setCat = function(id){ SRC.curCat = id; renderCats(); loadSources(); };
   window.SRC_search = function(v){ SRC.keyword = v; SRC.page = 1; clearTimeout(SRC._st); SRC._st=setTimeout(loadSources, 250); };
 
+  // ===== 代码爬取通道辅助函数 =====
+  window.SRC_crawlerCopy = function(){
+    const ta = $("crawlerCode");
+    ta.select();
+    document.execCommand("copy");
+    toast("代码已复制到剪贴板", "ok");
+  };
+
+  window.SRC_crawlerUpload = async function(input){
+    if(!input.files[0]) return;
+    const name = $("crawlerName").value.trim();
+    const cat = $("addCat").value;
+    const fd = new FormData();
+    fd.append("file", input.files[0]);
+    if(name) fd.append("name", name);
+    if(cat) fd.append("category_id", cat);
+    try{
+      const r = await fetch("/api/crawler/import-json", {method:"POST", body:fd});
+      const j = await r.json();
+      if(j.ok){
+        toast(`导入成功！${j.data.row_count} 行 / ${j.data.col_count} 列`, "ok");
+        SRC_closeAdd();
+        loadSources();
+      } else {
+        toast(j.msg || "导入失败", "err");
+      }
+    }catch(e){
+      toast("导入失败: " + e.message, "err");
+    }
+  };
+
+
   /* ---------- 渲染数据源卡片 ---------- */
   const CHANNEL_LABEL = {excel:"Excel", folder:"文件夹", database:"数据库", crawler:"爬虫"};
   const CHANNEL_ICON = {
@@ -324,7 +356,7 @@
       {k:"excel", label:"Excel 文件", desc:"上传 .xlsx/.csv 自动解析", icon:"📊"},
       {k:"folder", label:"文件夹导入", desc:"批量导入目录下所有 Excel", icon:"📁"},
       {k:"database", label:"数据库连接", desc:"待接入接口", icon:"🗄️", disabled:true},
-      {k:"crawler", label:"代码爬取", desc:"待接入接口", icon:"🕷️", disabled:true},
+      {k:"crawler", label:"代码爬取", desc:"生成JS代码抓取后台数据", icon:"🕷️"},
     ];
     $("addChannelPicker").innerHTML = channels.map(c=>`
       <div class="channel-opt ${SRC.addChannel===c.k?'sel':''} ${c.disabled?'disabled':''}" ${c.disabled?'':`onclick="SRC_pickChannel('${c.k}')"`}>
@@ -333,6 +365,16 @@
         <div class="cd">${c.desc}</div>
       </div>`).join("");
     SRC_renderAddForm();
+    // 根据通道设置提交按钮文字
+    const btn = $("addSubmitBtn");
+    if(btn){
+      btn.style.display = "";
+      btn.disabled = false;
+      if(SRC.addChannel === "excel") btn.textContent = "开始采集";
+      else if(SRC.addChannel === "folder") btn.textContent = "开始导入";
+      else if(SRC.addChannel === "crawler") btn.textContent = "生成抓取代码";
+      else btn.textContent = "开始采集";
+    }
     if(SRC.view === "detail" && SRC.curCat){
       setTimeout(()=>{ const sel=document.getElementById("addCat"); if(sel) sel.value=SRC.curCat; }, 0);
     }
@@ -382,6 +424,55 @@
         <div class="form-row">
           <label>统一分类 <span class="hint">导入的所有文件归到此分类</span></label>
           <select id="addCat">${SRC_catOptions()}</select>
+        </div>`;
+    } else if(SRC.addChannel === "crawler"){
+      body.innerHTML = `
+        <div class="form-row">
+          <label>数据源名称</label>
+          <input type="text" id="crawlerName" placeholder="例如：会员信息">
+        </div>
+        <div class="form-row">
+          <label>目标模块URL <span class="hint">森宇后台模块路径，如 /admin/health/index</span></label>
+          <input type="text" id="crawlerApi" placeholder="/admin/xxx/index">
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-row" style="flex:1">
+            <label>每页条数</label>
+            <input type="number" id="crawlerLimit" value="100" min="10" max="500">
+          </div>
+          <div class="form-row" style="flex:1">
+            <label>并发数</label>
+            <input type="number" id="crawlerConcurrency" value="2" min="1" max="5">
+          </div>
+          <div class="form-row" style="flex:1">
+            <label>间隔(ms)</label>
+            <input type="number" id="crawlerDelay" value="800" min="0" max="5000">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>所属分类</label>
+          <select id="addCat">${SRC_catOptions()}</select>
+        </div>
+        <div id="crawlerCodeWrap" style="display:none">
+          <div class="form-row">
+            <label>抓取代码 <span class="hint">复制到浏览器控制台执行</span></label>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+              <button type="button" class="btn btn-ghost" onclick="SRC_crawlerCopy()" style="flex:1">📋 复制代码</button>
+            </div>
+            <textarea id="crawlerCode" readonly style="width:100%;height:180px;font-family:Consolas,monospace;font-size:11px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#f8faf9;resize:vertical"></textarea>
+          </div>
+          <div style="background:#f0f7f5;border:1px solid #c8e0da;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12.5px;color:var(--sub);line-height:1.8">
+            <b style="color:var(--ink)">使用步骤：</b><br>
+            1. 在浏览器中登录森宇后台，打开目标模块页面<br>
+            2. 按 F12 打开开发者工具，切换到 Console（控制台）<br>
+            3. 粘贴上面的代码并回车，等待抓取完成<br>
+            4. 浏览器自动下载 JSON 文件后，点击下方"上传JSON结果"<br>
+            <b style="color:#d4770b">注意：只做只读抓取，严禁点击删除/修改等写操作按钮</b>
+          </div>
+          <div class="form-row">
+            <button type="button" class="btn btn-primary" onclick="$('crawlerJsonFile').click()" style="width:100%">📤 上传 JSON 结果</button>
+            <input type="file" id="crawlerJsonFile" accept=".json" style="display:none" onchange="SRC_crawlerUpload(this)">
+          </div>
         </div>`;
     } else {
       body.innerHTML = `<div style="text-align:center;padding:30px;color:var(--faint)">该通道待接入接口，暂不可用</div>`;
@@ -446,6 +537,41 @@
   };
 
   window.SRC_submitAdd = async function(){
+    if(SRC.addChannel === "crawler"){
+      const name = $("crawlerName").value.trim();
+      const api = $("crawlerApi").value.trim();
+      if(!name){ toast("请输入数据源名称", "err"); return; }
+      if(!api){ toast("请输入目标模块URL", "err"); return; }
+      $("addSubmitBtn").disabled = true;
+      $("addSubmitBtn").innerHTML = '<span class="spinner"></span> 生成中...';
+      try{
+        const r = await fetch("/api/crawler/generate-code", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            name: name, api_url: api,
+            limit: parseInt($("crawlerLimit").value) || 100,
+            concurrency: parseInt($("crawlerConcurrency").value) || 2,
+            delay: parseInt($("crawlerDelay").value) || 800,
+          })
+        });
+        const j = await r.json();
+        if(j.ok){
+          $("crawlerCode").value = j.code;
+          $("crawlerCodeWrap").style.display = "block";
+          $("addSubmitBtn").style.display = "none";
+          toast("代码已生成，请复制到浏览器执行", "ok");
+        } else {
+          toast(j.msg || "生成失败", "err");
+        }
+      }catch(e){
+        toast("生成失败: " + e.message, "err");
+      }finally{
+        $("addSubmitBtn").disabled = false;
+        $("addSubmitBtn").innerHTML = "生成抓取代码";
+      }
+      return;
+    }
     if(SRC.addChannel === "excel"){
       const fileInput = $("excelFile");
       if(!fileInput.files[0]){ toast("请先选择文件", "err"); return; }
