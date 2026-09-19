@@ -141,6 +141,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
 <link rel="stylesheet" href="/static/sources.css">
 <link rel="stylesheet" href="/static/logs.css">
 <link rel="stylesheet" href="/static/clean.css">
+<link rel="stylesheet" href="/static/calc.css">
 </head>
 <body>
 <div class="app">
@@ -158,8 +159,8 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
         <div class="nav-item" id="navClean" onclick="goModule('clean')">
           <span class="nav-icon">🧹</span><span class="nav-label">数据清洗</span>
         </div>
-        <div class="nav-item disabled" onclick="toast('数据计算模块即将上线')">
-          <span class="nav-icon">🧮</span><span class="nav-label">数据计算</span><span class="nav-soon">即将上线</span>
+        <div class="nav-item" id="navCalc" onclick="goModule('calc')">
+          <span class="nav-icon">🧮</span><span class="nav-label">数据计算</span>
         </div>
         <div class="nav-item has-sub" id="navDistribute" onclick="toggleDistribute()">
           <span class="nav-icon">📤</span><span class="nav-label">数据分发</span><span class="nav-arrow" id="distArrow">▾</span>
@@ -249,6 +250,20 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
             </div>
           </div>
         </div>
+      </section>
+      <!-- 数据计算面板 -->
+      <section class="panel" data-module="calc">
+        <div id="calcListPanel">
+          <div class="page-head">
+            <div>
+              <h2>数据计算</h2>
+              <p class="page-sub">通过 SQL 查询或表关联，从已有数据源生成新的衍生数据源</p>
+            </div>
+            <button class="btn btn-primary" onclick="CA_openNew()">+ 新建计算任务</button>
+          </div>
+          <div class="calc-task-grid" id="calcTaskList"></div>
+        </div>
+        <div id="calcNewPanel" style="display:none"></div>
       </section>
       <!-- 数据清洗面板 -->
       <section class="panel" data-module="clean">
@@ -1057,5 +1072,6 @@ renderNav();goStep(1);
 <script src="/static/sources.js"></script>
 <script src="/static/logs.js"></script>
 <script src="/static/clean.js"></script>
+<script src="/static/calc.js"></script>
 </body>
 </html>

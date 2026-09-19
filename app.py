@@ -19,6 +19,7 @@ from api.sources import bp as sources_bp
 from api.collect import bp as collect_bp
 from api.logs import bp as logs_bp
 from api.clean import bp as clean_bp
+from api.calc import bp as calc_bp
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -32,6 +33,7 @@ app.register_blueprint(sources_bp, url_prefix="/api")
 app.register_blueprint(collect_bp, url_prefix="/api")
 app.register_blueprint(logs_bp, url_prefix="/api")
 app.register_blueprint(clean_bp, url_prefix="/api")
+app.register_blueprint(calc_bp, url_prefix="/api")
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 最大 512MB
 
 _tk_lock = threading.Lock()
