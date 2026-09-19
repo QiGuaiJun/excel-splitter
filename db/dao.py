@@ -95,9 +95,10 @@ class DataSourceDAO(BaseDAO):
     """数据源 DAO。"""
 
     @staticmethod
-    def list_all(category_id=None, keyword=None, filter_null=False, page=1, page_size=None):
-        """获取数据源列表，支持分类筛选、关键词搜索（名称+原始文件名）、分页。
-        filter_null=True 时筛选 category_id IS NULL（未分类）。"""
+    def list_all(category_id=None, keyword=None, filter_null=False, page=1, page_size=None, channel_filter=None):
+        """获取数据源列表，支持分类筛选、关键词搜索（名称+原始文件名）、分页、通道筛选。
+        filter_null=True 时筛选 category_id IS NULL（未分类）。
+        channel_filter 时筛选指定 channel。"""
         where = "WHERE 1=1"
         params = []
         if filter_null:
@@ -108,6 +109,9 @@ class DataSourceDAO(BaseDAO):
         if keyword:
             where += " AND (ds.name LIKE %s OR ds.config LIKE %s)"
             params.extend([f"%{keyword}%", f"%{keyword}%"])
+        if channel_filter:
+            where += " AND ds.channel = %s"
+            params.append(channel_filter)
         # 总数
         count_sql = f"SELECT COUNT(*) AS cnt FROM data_sources ds LEFT JOIN categories c ON ds.category_id = c.id {where}"
         with DataSourceDAO._conn() as conn:
