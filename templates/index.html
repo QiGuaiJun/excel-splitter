@@ -139,6 +139,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
 @media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:10px}.brand{border:none;padding:0 12px 0 0}.nav{flex-direction:row;margin:0}.step .d,.side-foot{display:none}.stage,.topbar,.footer{padding-left:18px;padding-right:18px}.summary{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/static/sources.css">
+<link rel="stylesheet" href="/static/logs.css">
 </head>
 <body>
 <div class="app">
@@ -166,8 +167,8 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
       </div>
       <div class="nav-section">
         <div class="nav-title">运维</div>
-        <div class="nav-item disabled" onclick="toast('运行历史模块即将上线')">
-          <span class="nav-icon">🕐</span><span class="nav-label">运行历史</span><span class="nav-soon">即将上线</span>
+        <div class="nav-item" id="navLogs" onclick="goModule('logs')">
+          <span class="nav-icon">🕐</span><span class="nav-label">运行历史</span>
         </div>
       </div>
     </nav>
@@ -248,6 +249,47 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
           </div>
         </div>
       </section>
+      <!-- 运行历史面板 -->
+      <section class="panel" data-module="logs">
+        <div class="page-head">
+          <div>
+            <h2>运行历史</h2>
+            <p class="page-sub">查看所有采集和分发操作的记录，支持筛选和详情查看</p>
+          </div>
+        </div>
+        <div class="log-stats" id="logStats"></div>
+        <div class="log-filter-bar">
+          <div class="log-filter-tabs">
+            <button class="log-filter-tab active" onclick="LOG_filterStatus('');this.parentNode.querySelectorAll('.log-filter-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">全部</button>
+            <button class="log-filter-tab" onclick="LOG_filterStatus('success');this.parentNode.querySelectorAll('.log-filter-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">成功</button>
+            <button class="log-filter-tab" onclick="LOG_filterStatus('failed');this.parentNode.querySelectorAll('.log-filter-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">失败</button>
+          </div>
+          <button class="btn btn-ghost log-refresh-btn" onclick="LOG_refresh()">🔄 刷新</button>
+        </div>
+        <div class="log-list">
+          <div class="log-header">
+            <div>时间</div>
+            <div>数据源</div>
+            <div>通道</div>
+            <div>状态</div>
+            <div>行数</div>
+            <div>耗时</div>
+          </div>
+          <div id="logList"></div>
+        </div>
+        <div class="log-pagination" id="logPagination"></div>
+      </section>
+
+      <!-- 运行历史详情弹窗 -->
+      <div class="modal-mask" id="logDetailModal" onclick="if(event.target===this)LOG_closeDetail()">
+        <div class="modal" style="max-width:640px">
+          <div class="modal-head">
+            <h3>运行详情</h3>
+            <button class="modal-close" onclick="LOG_closeDetail()">✕</button>
+          </div>
+          <div class="modal-body" id="logDetailBody"></div>
+        </div>
+      </div>
       <!-- 1 文件+子表 -->
       <section class="panel show" data-step="1">
         <div class="card">
@@ -998,5 +1040,6 @@ renderNav();goStep(1);
   </div>
 </div>
 <script src="/static/sources.js"></script>
+<script src="/static/logs.js"></script>
 </body>
 </html>

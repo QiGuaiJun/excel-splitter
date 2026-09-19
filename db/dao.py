@@ -252,8 +252,82 @@ class CollectionLogDAO(BaseDAO):
 
     @staticmethod
     def get_by_id(log_id):
-        sql = "SELECT * FROM collection_logs WHERE id = %s"
+        sql = """SELECT l.*, s.name as source_name, s.channel as source_channel
+                 FROM collection_logs l
+                 LEFT JOIN data_sources s ON l.source_id = s.id
+                 WHERE l.id = %s"""
         with CollectionLogDAO._conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (log_id,))
-                return cur.fetchone()
+                row = cur.fetchone()
+                if row:
+                    row["created_at"] = CollectionLogDAO._fmt_time(row.get("created_at"))
+                return row
+
+    @staticmethod
+    def list_all(page=1, page_size=20, status=None, start_date=None, end_date=None):
+        """全量日志列表，支持分页和筛选，关联数据源名称。"""
+        where = []
+        params = []
+        if status:
+            where.append("l.status = %s")
+            params.append(status)
+        if start_date:
+            where.append("l.created_at >= %s")
+            params.append(start_date)
+        if end_date:
+            where.append("l.created_at <= %s")
+            params.append(end_date)
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        offset = (page - 1) * page_size
+
+        count_sql = f"SELECT COUNT(*) as cnt FROM collection_logs l{where_sql}"
+        list_sql = f"""SELECT l.*, s.name as source_name, s.channel as source_channel
+                        FROM collection_logs l
+                        LEFT JOIN data_sources s ON l.source_id = s.id
+                        {where_sql}
+                        ORDER BY l.created_at DESC, l.id DESC
+                        LIMIT %s OFFSET %s"""
+
+        with CollectionLogDAO._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(count_sql, params)
+                total = cur.fetchone()["cnt"]
+                cur.execute(list_sql, params + [page_size, offset])
+                rows = cur.fetchall()
+                for r in rows:
+                    r["created_at"] = CollectionLogDAO._fmt_time(r.get("created_at"))
+                return rows, total
+
+    @staticmethod
+    def get_stats():
+        """获取日志统计：总次数、成功、失败、平均耗时。"""
+        sql = """SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) as success,
+                    SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed,
+                    AVG(duration_ms) as avg_duration
+                 FROM collection_logs
+                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"""
+        with CollectionLogDAO._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                row = cur.fetchone()
+                return {
+                    "total": row["total"] or 0,
+                    "success": row["success"] or 0,
+                    "failed": row["failed"] or 0,
+                    "avg_duration": round(row["avg_duration"] or 0, 1),
+                }
+
+    @staticmethod
+    def _fmt_time(val):
+        """datetime 转本地时间字符串。"""
+        if val is None:
+            return None
+        if isinstance(val, str):
+            return val
+        try:
+            return val.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return str(val)
