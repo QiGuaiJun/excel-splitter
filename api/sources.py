@@ -101,7 +101,7 @@ def list_sources():
             "total": DataSourceDAO.count_all(),
             "ready": DataSourceDAO.count_by_status("ready"),
             "pending": DataSourceDAO.count_by_status("pending"),
-            "error": DataSourceDAO.count_by_status("error"),
+            "failed": DataSourceDAO.count_by_status("failed"),
         },
     })
 

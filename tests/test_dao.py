@@ -196,4 +196,35 @@ class TestCascadeDelete:
         assert CollectionLogDAO.list_by_source(sid) == []
 
 
-# 注：count_by_status("failed") 的回归测试与 P0 bug 一起放到批次 3。
+# ============================================================================
+# Bug 回归：P0 — stats 接口 count_by_status("error") ⇒ 永远是 0（schema 注释定义的是 "failed"）
+# ============================================================================
+@pytest.mark.db
+class TestStatusFilterRegression:
+    """验证 batch 3 修过的 P0 bug 不再复发。"""
+
+    def test_count_by_status_failed_works(self):
+        sid = DataSourceDAO.create(name=f"{P}failed_target", channel="excel", status="pending")
+        try:
+            DataSourceDAO.update_collect_result(sid, row_count=10, col_count=5, status="failed")
+            assert DataSourceDAO.count_by_status("failed") >= 1
+        finally:
+            DataSourceDAO.delete(sid)
+
+    def test_sources_api_stats_uses_failed_key(self):
+        # 这个对应 api/sources.py 的 stats 字段，bug 是写成 "error" 永远=0
+        from app import app
+        client = app.test_client()
+        # 故意把一个数据源改成 failed，再调用 stats
+        sid = DataSourceDAO.create(name=f"{P}failed_for_api", channel="excel", status="pending")
+        try:
+            DataSourceDAO.update_collect_result(sid, row_count=10, col_count=5, status="failed")
+            r = client.get("/api/sources")
+            data = r.get_json()
+            assert data["ok"]
+            # API 应该返回 failed 字段（旧 bug 是返回 error）
+            assert "failed" in data["stats"]
+            assert "error" not in data["stats"]
+            assert data["stats"]["failed"] >= 1
+        finally:
+            DataSourceDAO.delete(sid)
