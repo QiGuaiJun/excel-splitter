@@ -23,6 +23,19 @@ from datetime import datetime
 import pandas as pd
 from flask import Blueprint, request, jsonify
 
+# 批次 6：业务层放 services/*，本模块只做路由 + IO。
+from services.masking import (
+    RULES,
+    apply_mask,
+    mask_address,
+    mask_idcard,
+    mask_keep_ab,
+    mask_name,
+    mask_phone,
+    mask_replace,
+)
+from services.summary_builder import build_summary, _to_num  # noqa: F401  _to_num 同名
+
 
 # ----------------------------------------------------------------------------
 # 全局状态
@@ -63,117 +76,8 @@ def _config_dir() -> str:
 
 
 # ----------------------------------------------------------------------------
-# 脱敏引擎
+# 脱敏引擎 — 移到 services/masking.py，本模块做路由只做 from-import 重导出。
 # ----------------------------------------------------------------------------
-def _digits(s: str) -> str:
-    return re.sub(r"\D", "", str(s))
-
-
-def mask_phone(v):
-    """手机号：保留前3后4，其余位用 *（标准11位 => 138****5678）"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    d = _digits(s)
-    if len(d) >= 7:
-        return d[:3] + "*" * (len(d) - 7) + d[-4:]
-    return "*" * len(s)  # 异常号码：整体遮罩
-
-
-def mask_idcard(v):
-    """身份证：保留前4后4，其余用 *（18位 => 3307**********1234）"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    if len(s) >= 8:
-        return s[:4] + "*" * (len(s) - 8) + s[-4:]
-    return "*" * len(s)
-
-
-def mask_name(v):
-    """姓名：保留姓（第一个字符），其余用 *"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    if len(s) == 1:
-        return s
-    return s[0] + "*" * (len(s) - 1)
-
-
-def mask_address(v):
-    """详细地址：保留到区/县(县级市)，其后统一打 ****"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    # 先定位省级（省 / 自治区 / 特别行政区 / 直辖市的第一个"市"）
-    prov = re.search(r"^.*?(省|自治区|特别行政区|市)", s)
-    start = prov.end() if prov else 0
-    rest = s[start:]
-    head = None
-    m = re.search(r"^.*?[区县旗]", rest)
-    if m:
-        head = s[: start + len(m.group(0))]
-    else:
-        # 没有区/县：按"市"判断，取到县级市（省内地级市之后的第二个市）
-        city_idx = [i for i, c in enumerate(rest) if c == "市"]
-        if len(city_idx) >= 2:
-            head = s[: start + city_idx[1] + 1]
-        elif len(city_idx) == 1:
-            head = s[: start + city_idx[0] + 1]
-    if not head:
-        head = s[: min(6, len(s))]  # 兜底：保留前 6 字
-    if len(head) >= len(s):
-        return s  # 本身就没有更细的地址，原样返回
-    return head + "****"
-
-
-def mask_keep_ab(v, a=0, b=0):
-    """通用：保留前 a 位、后 b 位，其余用 *"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    a, b = int(a or 0), int(b or 0)
-    if len(s) <= a + b:
-        return "*" * len(s)
-    return s[:a] + "*" * (len(s) - a - b) + (s[-b:] if b else "")
-
-
-def mask_replace(v, text="***"):
-    """整列非空值统一替换为指定文字"""
-    if v is None:
-        return v
-    s = str(v).strip()
-    if s == "" or s.lower() == "nan":
-        return ""
-    return text or "***"
-
-
-RULES = {
-    "phone": ("手机号(前3后4)", mask_phone),
-    "idcard": ("身份证(前4后4)", mask_idcard),
-    "address": ("详细地址(保留到区县)", mask_address),
-    "name": ("姓名(留姓)", mask_name),
-}
-
-
-def apply_mask(series: pd.Series, rule: dict) -> pd.Series:
-    t = rule.get("type")
-    if t == "keep_ab":
-        return series.map(lambda x: mask_keep_ab(x, rule.get("a", 0), rule.get("b", 0)))
-    if t == "replace":
-        return series.map(lambda x: mask_replace(x, rule.get("text", "***")))
-    fn = RULES.get(t, (None, mask_replace))[1]
-    return series.map(fn)
 
 
 # ----------------------------------------------------------------------------
@@ -350,77 +254,7 @@ def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=No
     return result
 
 
-def build_summary(sub: pd.DataFrame, scfg: dict):
-    """聚合：计数(行数/去重)+求和，末行合计；支持分组列别名；无分组时整表一行总计。"""
-    groups = scfg.get("groups") or []
-    graw = [g for g in groups if g.get("col") in sub.columns]
-    gcols = [g["col"] for g in graw]
-    galias = {}
-    for g in graw:
-        al = str(g.get("label") or "").strip()
-        galias[g["col"]] = al if al else g["col"]
-    sums = [s for s in (scfg.get("sums") or []) if s.get("col") in sub.columns]
-    counts = [c for c in (scfg.get("counts") or []) if c.get("col") in sub.columns]
-
-    work = sub.copy()
-    agg, label_order = {}, []
-    for c in counts:
-        lab = c.get("label") or (c["col"] + ("数" if c.get("distinct") else "行数"))
-        agg[lab] = (c["col"], "nunique" if c.get("distinct") else "count")
-        label_order.append(("count", lab))
-    for idx, s in enumerate(sums):
-        lab = s.get("label") or (s["col"] + "合计")
-        key = f"__num_{idx}"
-        work[key] = _to_num(work[s["col"]])
-        agg[lab] = (key, "sum")
-        label_order.append(("sum", lab))
-    if not agg:
-        return None
-
-    metric_cols = [lab for _, lab in label_order]
-
-    def _whole_row(frame):
-        row = {}
-        for kind, lab in label_order:
-            col, how = agg[lab]
-            if how == "sum":
-                row[lab] = round(float(pd.to_numeric(frame[col], errors="coerce").sum()), 2)
-            elif how == "nunique":
-                row[lab] = int(frame[col].nunique())
-            else:
-                row[lab] = int(frame[col].count())
-        return row
-
-    if not gcols:  # 无分组维度：整张表只输出一行总计
-        return pd.DataFrame([_whole_row(work)])[metric_cols]
-
-    res = work.groupby(gcols, dropna=False, sort=False).agg(**agg).reset_index()
-    for kind, lab in label_order:
-        if kind == "sum":
-            res[lab] = pd.to_numeric(res[lab], errors="coerce").fillna(0).round(2)
-        else:
-            res[lab] = pd.to_numeric(res[lab], errors="coerce").fillna(0).astype(int)
-
-    sort_label = scfg.get("sort_label") or ""
-    sort_desc = bool(scfg.get("sort_desc", True))
-    alias2col = {a: c for c, a in galias.items()}
-    if sort_label in metric_cols:
-        sort_key = sort_label
-    elif sort_label in galias.values():
-        sort_key = alias2col[sort_label]
-    else:
-        sort_key = None
-    if sort_key is not None:
-        res = res.sort_values(
-            by=sort_key, ascending=not sort_desc, kind="mergesort"
-        ).reset_index(drop=True)
-
-    total = _whole_row(work)
-    for _gi, g in enumerate(gcols):
-        total[g] = "合计" if _gi == 0 else ""
-    res = pd.concat([res, pd.DataFrame([total])], ignore_index=True)
-    res = res[gcols + metric_cols].rename(columns=galias)
-    return res
+# build_summary 已迁到 services.summary_builder，详见顶部 import。
 
 
 def _autofit_ws(ws, bold_last=False):

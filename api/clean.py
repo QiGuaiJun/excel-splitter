@@ -8,6 +8,7 @@ import pandas as pd
 
 from db.dao import DataSourceDAO, CollectionLogDAO
 from db.connection import BASE_DIR
+from services.dataframe_loader import load_dataframe_by_source_id
 
 bp = Blueprint("clean", __name__)
 
@@ -16,28 +17,11 @@ os.makedirs(SOURCES_DIR, exist_ok=True)
 
 
 def _load_dataframe(source_id):
-    """根据数据源ID加载 DataFrame。"""
+    """根据数据源ID加载 DataFrame（已迁到 services.dataframe_loader）。"""
     ds = DataSourceDAO.get_by_id(source_id)
     if not ds:
         return None, "数据源不存在"
-    file_path = ds.get("file_path")
-    if not file_path or not os.path.exists(file_path):
-        return None, "源文件不存在"
-    ext = os.path.splitext(file_path)[1].lower()
-    try:
-        if ext in (".xlsx", ".xls"):
-            df = pd.read_excel(file_path, dtype=str)
-        elif ext == ".csv":
-            df = pd.read_csv(file_path, dtype=str, encoding="utf-8-sig")
-        elif ext == ".json":
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            df = pd.DataFrame(data)
-        else:
-            return None, f"不支持的文件格式: {ext}"
-    except Exception as e:
-        return None, f"读取文件失败: {str(e)}"
-    return df, None
+    return load_dataframe_by_source_id(source_id, ds.get("file_path") or "")
 
 
 def _apply_rules(df, rules):

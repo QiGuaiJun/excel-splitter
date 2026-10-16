@@ -48,24 +48,29 @@ app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 最大 512MB
 # 直接 `import app` 然后 `A.mask_phone(...)`）。批次 5 把这些测试迁到
 # tests/ 下后，会同步把 import 改成 `from api.distribute import ...`。
 # ---------------------------------------------------------------------------
-from api.distribute import (  # noqa: E402, F401
+# ---------------------------------------------------------------------------
+# 重新导出分发层 / 服务层 函数
+# 批次 6 之后，业务函数实际定义在 services/；api/distribute.py 是路由层，
+# 也保留重导出。本文件统一以 services 为权威源，避免依赖传递不清。
+# ---------------------------------------------------------------------------
+from services.masking import (  # noqa: E402, F401
     RULES,
-    _autofit_ws,
-    _col_meta,
-    _digits,
-    _excel_row_number,
-    _is_multi_value,
-    _safe_filename,
-    _sheet_to_df,
-    _to_num,
     apply_mask,
-    build_summary,
     mask_address,
     mask_idcard,
     mask_keep_ab,
     mask_name,
     mask_phone,
     mask_replace,
+)
+from services.summary_builder import build_summary, _to_num  # noqa: E402, F401
+from api.distribute import (  # noqa: E402, F401
+    _autofit_ws,
+    _col_meta,
+    _excel_row_number,
+    _is_multi_value,
+    _safe_filename,
+    _sheet_to_df,
 )
 
 
