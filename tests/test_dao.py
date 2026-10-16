@@ -1,174 +1,199 @@
 # -*- coding: utf-8 -*-
-"""数据层 DAO 测试：categories / data_sources / collection_logs 全量 CRUD。"""
-import os
-import sys
+"""categories / data_sources / collection_logs 全量 CRUD 单测。
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
+依赖：MySQL 测试库（端口 3307）。DB 不可达时整个文件被 module-level skip，
+不会污染其他测试，也不会在 setup 阶段抛 ERROR。
+"""
+import pytest
 
-from db.dao import CategoryDAO, DataSourceDAO, CollectionLogDAO
-from db.init_db import init_db
+# 模块级 skip：必须放在所有用到 DAO 的 import 之前（pytest 文档推荐做法）
+from tests.conftest import mysql_reachable_from_config
 
-fail = 0
-def check(name, cond, extra=""):
-    global fail
-    print(("[通过] " if cond else "[失败] ") + name + (f"  -> {extra}" if extra else ""))
-    if not cond:
-        fail += 1
+if not mysql_reachable_from_config():
+    pytest.skip("MySQL 测试库不可达（端口 3307 未开放或配置缺失），跳过整个文件", allow_module_level=True)
 
-# 确保表存在
+from db.dao import CategoryDAO, DataSourceDAO, CollectionLogDAO  # noqa: E402
+from db.init_db import init_db  # noqa: E402
+
+
+# 会话级只跑一次 init_db（应在 skip 之后再调用）
 init_db()
 
-# 用唯一前缀避免测试数据残留冲突
 P = "t_dao_"
 
-# ========== CategoryDAO ==========
-print("\n===== CategoryDAO =====")
 
-# 清理旧测试数据
-for c in CategoryDAO.list_all():
-    if c["name"].startswith(P):
-        CategoryDAO.delete(c["id"])
+@pytest.fixture(autouse=True)
+def _cleanup():
+    """每个用例前后清理 t_dao_ 前缀的残留数据。"""
+    for ds in DataSourceDAO.list_all()[0]:
+        if ds["name"].startswith(P):
+            DataSourceDAO.delete(ds["id"])
+    for c in CategoryDAO.list_all():
+        if c["name"].startswith(P):
+            CategoryDAO.delete(c["id"])
+    yield
+    for ds in DataSourceDAO.list_all()[0]:
+        if ds["name"].startswith(P):
+            DataSourceDAO.delete(ds["id"])
+    for c in CategoryDAO.list_all():
+        if c["name"].startswith(P):
+            CategoryDAO.delete(c["id"])
 
-# create + get_by_id
-cid = CategoryDAO.create(f"{P}订单表", sort=2)
-check("create 返回有效 ID", cid > 0, str(cid))
-c = CategoryDAO.get_by_id(cid)
-check("get_by_id 名称正确", c["name"] == f"{P}订单表", str(c))
-check("get_by_id sort 正确", c["sort"] == 2, str(c["sort"]))
 
-# get_by_name
-c2 = CategoryDAO.get_by_name(f"{P}订单表")
-check("get_by_name 命中", c2 is not None and c2["id"] == cid)
+# ============================================================================
+# CategoryDAO
+# ============================================================================
+@pytest.mark.db
+class TestCategoryDAO:
+    def test_create_returns_id(self):
+        cid = CategoryDAO.create(f"{P}订单表", sort=2)
+        assert cid > 0
+        c = CategoryDAO.get_by_id(cid)
+        assert c["name"] == f"{P}订单表"
+        assert c["sort"] == 2
 
-# list_all
-all_cats = CategoryDAO.list_all()
-check("list_all 包含新建分类", any(x["id"] == cid for x in all_cats), f"共{len(all_cats)}个")
+    def test_get_by_name_hit(self):
+        cid = CategoryDAO.create(f"{P}by_name")
+        found = CategoryDAO.get_by_name(f"{P}by_name")
+        assert found is not None
+        assert found["id"] == cid
 
-# update
-ok = CategoryDAO.update(cid, name=f"{P}订单表-改", sort=5)
-check("update 成功", ok)
-c3 = CategoryDAO.get_by_id(cid)
-check("update 后名称正确", c3["name"] == f"{P}订单表-改", str(c3["name"]))
-check("update 后 sort 正确", c3["sort"] == 5, str(c3["sort"]))
+    def test_list_all_contains_created(self):
+        cid = CategoryDAO.create(f"{P}list_all")
+        cats = CategoryDAO.list_all()
+        assert any(c["id"] == cid for c in cats)
 
-# count_sources（此时无数据源）
-check("count_sources 空分类=0", CategoryDAO.count_sources(cid) == 0)
+    def test_update_name_and_sort(self):
+        cid = CategoryDAO.create(f"{P}update", sort=1)
+        ok = CategoryDAO.update(cid, name=f"{P}update-ed", sort=5)
+        assert ok is True
+        c = CategoryDAO.get_by_id(cid)
+        assert c["name"] == f"{P}update-ed"
+        assert c["sort"] == 5
 
-# delete 空分类成功
-ok = CategoryDAO.delete(cid)
-check("delete 空分类成功", ok)
-check("delete 后查不到", CategoryDAO.get_by_id(cid) is None)
+    def test_count_sources_empty(self):
+        cid = CategoryDAO.create(f"{P}count_empty")
+        assert CategoryDAO.count_sources(cid) == 0
 
-# ========== DataSourceDAO ==========
-print("\n===== DataSourceDAO =====")
+    def test_delete_empty_category_succeeds(self):
+        cid = CategoryDAO.create(f"{P}delete_empty")
+        assert CategoryDAO.delete(cid) is True
+        assert CategoryDAO.get_by_id(cid) is None
 
-# 清理旧测试数据
-for ds in DataSourceDAO.list_all()[0]:
-    if ds["name"].startswith(P):
-        DataSourceDAO.delete(ds["id"])
-for c in CategoryDAO.list_all():
-    if c["name"].startswith(P):
-        CategoryDAO.delete(c["id"])
 
-# 建一个分类用于关联
-cat_id = CategoryDAO.create(f"{P}测试分类", sort=1)
+# ============================================================================
+# DataSourceDAO
+# ============================================================================
+@pytest.mark.db
+class TestDataSourceDAO:
+    def test_create_get_by_id_round_trip(self):
+        cat_id = CategoryDAO.create(f"{P}ds_cat", sort=1)
+        sid = DataSourceDAO.create(
+            name=f"{P}ds",
+            channel="excel",
+            category_id=cat_id,
+            file_path="/data/test.xlsx",
+            config={"sheet": "明细"},
+            status="pending",
+        )
+        ds = DataSourceDAO.get_by_id(sid)
+        assert ds["name"] == f"{P}ds"
+        assert ds["channel"] == "excel"
+        assert ds["category_name"] == f"{P}ds_cat"
+        assert ds["config"] == {"sheet": "明细"}
+        assert ds["status"] == "pending"
 
-# create
-sid = DataSourceDAO.create(
-    name=f"{P}测试数据源",
-    channel="excel",
-    category_id=cat_id,
-    file_path="/data/test.xlsx",
-    config={"sheet": "明细"},
-    status="pending",
-)
-check("create 返回有效 ID", sid > 0, str(sid))
+    def test_list_all_category_filter(self):
+        cat_id = CategoryDAO.create(f"{P}ds_cat_filter", sort=1)
+        sid = DataSourceDAO.create(name=f"{P}ds_filter", channel="excel", category_id=cat_id)
+        rows, _ = DataSourceDAO.list_all(category_id=cat_id)
+        assert any(r["id"] == sid for r in rows)
 
-# get_by_id
-ds = DataSourceDAO.get_by_id(sid)
-check("get_by_id 名称正确", ds["name"] == f"{P}测试数据源", str(ds["name"]))
-check("get_by_id channel 正确", ds["channel"] == "excel")
-check("get_by_id category_name 关联正确", ds["category_name"] == f"{P}测试分类", str(ds.get("category_name")))
-check("get_by_id config JSON 反序列化正确", ds["config"] == {"sheet": "明细"}, str(ds["config"]))
-check("get_by_id 默认 status=pending", ds["status"] == "pending")
+    def test_list_all_keyword_search(self):
+        cat_id = CategoryDAO.create(f"{P}ds_cat_kw", sort=1)
+        sid = DataSourceDAO.create(name=f"{P}kw_marker", channel="excel", category_id=cat_id)
+        rows, _ = DataSourceDAO.list_all(keyword="kw_marker")
+        assert any(r["id"] == sid for r in rows)
 
-# list_all 全量
-all_ds = DataSourceDAO.list_all()[0]
-check("list_all 包含新建数据源", any(x["id"] == sid for x in all_ds), f"共{len(all_ds)}个")
+    def test_update(self):
+        sid = DataSourceDAO.create(name=f"{P}ds_update", channel="excel")
+        ok = DataSourceDAO.update(sid, name=f"{P}ds_update-ed", status="ready")
+        assert ok is True
+        ds = DataSourceDAO.get_by_id(sid)
+        assert ds["name"] == f"{P}ds_update-ed"
+        assert ds["status"] == "ready"
 
-# list_all 按分类筛选
-by_cat = DataSourceDAO.list_all(category_id=cat_id)[0]
-check("list_all 按分类筛选命中", len(by_cat) >= 1 and any(x["id"] == sid for x in by_cat), f"命中{len(by_cat)}个")
+    def test_update_collect_result(self):
+        sid = DataSourceDAO.create(name=f"{P}ds_collect", channel="excel")
+        ok = DataSourceDAO.update_collect_result(
+            sid, row_count=5286, col_count=12,
+            sheet_names=["明细", "说明"], status="ready",
+        )
+        assert ok is True
+        ds = DataSourceDAO.get_by_id(sid)
+        assert ds["row_count"] == 5286
+        assert ds["col_count"] == 12
+        assert ds["sheet_names"] == ["明细", "说明"]
+        assert ds["last_collected_at"] is not None
 
-# list_all 关键词搜索
-by_kw = DataSourceDAO.list_all(keyword="测试数据源")[0]
-check("list_all 关键词搜索命中", any(x["id"] == sid for x in by_kw), f"命中{len(by_kw)}个")
+    def test_count_all_and_count_by_status(self):
+        assert DataSourceDAO.count_all() >= 1
+        assert DataSourceDAO.count_by_status("ready") >= 1
 
-# update
-ok = DataSourceDAO.update(sid, name=f"{P}测试数据源-改", status="ready")
-check("update 成功", ok)
-ds2 = DataSourceDAO.get_by_id(sid)
-check("update 后名称正确", ds2["name"] == f"{P}测试数据源-改")
-check("update 后 status 正确", ds2["status"] == "ready")
+    def test_delete_with_source_blocks_category(self):
+        cat_id = CategoryDAO.create(f"{P}ds_cat_block", sort=1)
+        sid = DataSourceDAO.create(name=f"{P}ds_in_block", channel="excel", category_id=cat_id)
+        # 分类下有数据源 -> delete 返回 False
+        assert CategoryDAO.delete(cat_id) is False
+        # 删掉数据源后 -> 可以删除
+        assert DataSourceDAO.delete(sid) is True
+        assert CategoryDAO.delete(cat_id) is True
 
-# update_collect_result
-ok = DataSourceDAO.update_collect_result(sid, row_count=5286, col_count=12,
-                                            sheet_names=["明细", "说明"], status="ready")
-check("update_collect_result 成功", ok)
-ds3 = DataSourceDAO.get_by_id(sid)
-check("采集后 row_count=5286", ds3["row_count"] == 5286, str(ds3["row_count"]))
-check("采集后 col_count=12", ds3["col_count"] == 12)
-check("采集后 sheet_names 反序列化正确", ds3["sheet_names"] == ["明细", "说明"], str(ds3["sheet_names"]))
-check("采集后 last_collected_at 非空", ds3["last_collected_at"] is not None)
 
-# count_all / count_by_status
-check("count_all >= 1", DataSourceDAO.count_all() >= 1)
-check("count_by_status ready >= 1", DataSourceDAO.count_by_status("ready") >= 1)
+# ============================================================================
+# CollectionLogDAO
+# ============================================================================
+@pytest.mark.db
+class TestCollectionLogDAO:
+    def test_create_and_get_by_id(self):
+        sid = DataSourceDAO.create(name=f"{P}log_target", channel="excel")
+        lid = CollectionLogDAO.create(source_id=sid, status="success", row_count=5286, duration_ms=1234)
+        log = CollectionLogDAO.get_by_id(lid)
+        assert log["status"] == "success"
+        assert log["row_count"] == 5286
+        assert log["duration_ms"] == 1234
 
-# 分类有数据源时不能删除
-check("有数据源的分类 delete 返回 False", CategoryDAO.delete(cat_id) is False)
+    def test_create_failed_log(self):
+        sid = DataSourceDAO.create(name=f"{P}log_target2", channel="excel")
+        lid = CollectionLogDAO.create(
+            source_id=sid, status="failed", row_count=0,
+            error_msg="文件损坏，无法解析", duration_ms=50,
+        )
+        assert lid > 0
 
-# ========== CollectionLogDAO ==========
-print("\n===== CollectionLogDAO =====")
+    def test_list_by_source_returns_in_desc_order(self):
+        sid = DataSourceDAO.create(name=f"{P}log_target3", channel="excel")
+        CollectionLogDAO.create(source_id=sid, status="success", row_count=1, duration_ms=10)
+        CollectionLogDAO.create(source_id=sid, status="success", row_count=2, duration_ms=20)
+        logs = CollectionLogDAO.list_by_source(sid)
+        assert len(logs) == 2
+        # 时间倒序：第二个 create 的 id 应更大
+        assert logs[0]["id"] > logs[1]["id"]
 
-# create
-lid = CollectionLogDAO.create(source_id=sid, status="success", row_count=5286, duration_ms=1234)
-check("create 日志返回有效 ID", lid > 0, str(lid))
 
-# get_by_id
-log = CollectionLogDAO.get_by_id(lid)
-check("get_by_id 状态正确", log["status"] == "success")
-check("get_by_id row_count 正确", log["row_count"] == 5286)
-check("get_by_id duration_ms 正确", log["duration_ms"] == 1234)
+# ============================================================================
+# 级联删除
+# ============================================================================
+@pytest.mark.db
+class TestCascadeDelete:
+    def test_delete_source_cascades_logs(self):
+        sid = DataSourceDAO.create(name=f"{P}cascade_target", channel="excel")
+        CollectionLogDAO.create(source_id=sid, status="success", row_count=10, duration_ms=10)
+        CollectionLogDAO.create(source_id=sid, status="failed", row_count=0, duration_ms=10)
+        assert len(CollectionLogDAO.list_by_source(sid)) == 2
+        DataSourceDAO.delete(sid)
+        assert DataSourceDAO.get_by_id(sid) is None
+        assert CollectionLogDAO.list_by_source(sid) == []
 
-# 失败日志
-lid2 = CollectionLogDAO.create(source_id=sid, status="failed", row_count=0,
-                                 error_msg="文件损坏，无法解析", duration_ms=50)
-check("create 失败日志成功", lid2 > 0)
 
-# list_by_source
-logs = CollectionLogDAO.list_by_source(sid)
-check("list_by_source 返回 2 条", len(logs) == 2, f"返回{len(logs)}条")
-check("list_by_source 按时间倒序（最新在前）", logs[0]["id"] > logs[1]["id"])
-
-# ========== 级联删除验证 ==========
-print("\n===== 级联删除 =====")
-
-# 删除数据源，collection_logs 应级联删除
-ok = DataSourceDAO.delete(sid)
-check("delete 数据源成功", ok)
-check("delete 后查不到数据源", DataSourceDAO.get_by_id(sid) is None)
-logs_after = CollectionLogDAO.list_by_source(sid)
-check("级联删除后日志为空", len(logs_after) == 0, f"剩余{len(logs_after)}条")
-
-# 现在分类无数据源，可以删除
-ok = CategoryDAO.delete(cat_id)
-check("数据源删除后分类可删除", ok)
-
-# ========== 总结 ==========
-print("\n" + "=" * 50)
-if fail:
-    print(f"存在 {fail} 项未通过")
-    sys.exit(1)
-print("数据层 DAO 全部测试通过 ✓")
+# 注：count_by_status("failed") 的回归测试与 P0 bug 一起放到批次 3。
