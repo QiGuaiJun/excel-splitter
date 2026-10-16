@@ -34,27 +34,52 @@
   function hideModal(id){ $(id).classList.remove("show"); }
   function closeModalOnMask(e){ if(e.target.classList.contains("modal-mask")) e.target.classList.remove("show"); }
 
-  /* ---------- 模块切换（匹配原型导航架构） ---------- */
+  /* ---------- 模块切换（数据驱动） ---------- */
+  // 模块元数据：每个模块声明自己的面包屑 / 标题 / 上一步下一步可见性 / 进入时调用哪个 init
+  const MODULES = {
+    sources:    { crumb: "数据采集", title: "数据源管理中心", navId: "navSources",
+                  initFn: () => loadAll(), showStepNav: false },
+    distribute: { crumb: "数据链路", title: "数据分发",       navId: "navDistribute",
+                  initFn: null, showStepNav: true  },
+    logs:       { crumb: "运维",      title: "运行历史",       navId: "navLogs",
+                  initFn: typeof LOG_init === "function" ? LOG_init : null, showStepNav: false },
+    clean:      { crumb: "数据链路", title: "数据清洗",       navId: "navClean",
+                  initFn: typeof CL_init === "function" ? CL_init : null, showStepNav: false },
+    calc:       { crumb: "数据链路", title: "数据计算",       navId: "navCalc",
+                  initFn: typeof CA_init === "function" ? CA_init : null, showStepNav: false },
+  };
+
   window.goModule = function(mod){
     if(typeof currentModule !== "undefined") currentModule = mod;
+
+    // 隐藏所有面板
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("show"));
-    if(mod === "sources"){
-      const panel = document.querySelector('[data-module="sources"]');
+
+    const cfg = MODULES[mod];
+    if(cfg){
+      // 显示当前模块面板
+      const panel = document.querySelector(`[data-module="${mod}"]`);
       if(panel) panel.classList.add("show");
+      // 写面包屑和标题
       const crumb = $("crumb"), title = $("title");
-      if(crumb) crumb.textContent = "数据采集";
-      if(title) title.textContent = "数据源管理中心";
+      if(crumb) crumb.textContent = cfg.crumb;
+      if(title) title.textContent = cfg.title;
+      // 配置模板栏：仅分发模块显示
+      const tplbar = $("tplbar");
+      if(tplbar) tplbar.style.display = (mod === "distribute") ? "flex" : "none";
+      // 上一步/下一步：仅分发模块需要
       const prev = $("btnPrev"), next = $("btnNext");
-      if(prev) prev.style.visibility = "hidden";
-      if(next) next.style.display = "none";
-      loadAll();
+      if(prev) prev.style.visibility = cfg.showStepNav ? "visible" : "hidden";
+      if(next) next.style.display = cfg.showStepNav ? "" : "none";
+      // 调用模块自己的 init 函数（如果声明了）
+      if(typeof cfg.initFn === "function") cfg.initFn();
     }
+
+    // 导航高亮
     document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
-    if(mod === "sources") $("navSources")?.classList.add("active");
-    if(mod === "distribute") $("navDistribute")?.classList.add("active");
-    // 配置模板栏仅分发模块显示
-    const tplbar = $("tplbar");
-    if(tplbar) tplbar.style.display = (mod === "distribute") ? "flex" : "none";
+    if(cfg && cfg.navId){
+      $(cfg.navId)?.classList.add("active");
+    }
   };
   window.goSources = function(){ goModule("sources"); };
 
