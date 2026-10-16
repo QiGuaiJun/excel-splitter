@@ -8,12 +8,9 @@ from flask import Blueprint, request, jsonify
 from openpyxl import load_workbook
 
 from db.dao import DataSourceDAO, CollectionLogDAO
-from db.connection import BASE_DIR
+from api.paths_config import SOURCES_DIR
 
 bp = Blueprint("collect", __name__)
-
-SOURCES_DIR = os.path.join(BASE_DIR, "data", "sources")
-os.makedirs(SOURCES_DIR, exist_ok=True)
 
 ALLOWED_EXTS = {".xlsx", ".xls", ".csv"}
 

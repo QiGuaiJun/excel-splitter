@@ -38,18 +38,41 @@ from services.summary_builder import build_summary, _to_num  # noqa: F401  _to_n
 
 
 # ----------------------------------------------------------------------------
-# 全局状态
+# 全局状态（批次 8）
 # ----------------------------------------------------------------------------
 bp = Blueprint("distribute", __name__)
 
 
-# 拆分流程的 DataFrame 进程内缓存（按 file_id 缓存，避免预览/拆分重复读取）
+# 拆分流程的 DataFrame 进程内缓存（按 file_id 缓存，避免预览/拆分重复读取）。
+# 注意：app.run 单进程下 dict 本身是 thread-safe（CPython GIL），但显式加锁让
+# put+evict 这种"读-改-写"组合也原子 —— 多线程同时访问时不会爆 KeyError。
 _df_cache: dict = {}
+_df_cache_lock = threading.Lock()
 _CACHE_MAX = 2
 
 
-# 系统文件夹选择对话框的全局锁，避免重复弹框
+# 系统文件夹选择对话框的全局锁，避免重复弹框。
+# 应用层已经做 acquire(blocking=False)，遇占忙立刻返回 409，让用户能感知。
 _tk_lock = threading.Lock()
+
+
+def _cache_get(file_id):
+    with _df_cache_lock:
+        return _df_cache.get(file_id)
+
+
+def _cache_put(file_id, value):
+    """put + LRU-evict 原子化。返回 value 便于链式调用。"""
+    with _df_cache_lock:
+        _df_cache[file_id] = value
+        while len(_df_cache) > _CACHE_MAX:
+            _df_cache.pop(next(iter(_df_cache)))
+        return value
+
+
+def _cache_pop(file_id):
+    with _df_cache_lock:
+        return _df_cache.pop(file_id, None)
 
 
 # ----------------------------------------------------------------------------
@@ -210,7 +233,7 @@ def _clean(d):
 # ----------------------------------------------------------------------------
 def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=None):
     """读取并合并所选子表（含多表合并的「来源」列），带进程内缓存。"""
-    cached = _df_cache.get(file_id)
+    cached = _cache_get(file_id)
     if cached is not None:
         return cached
     frames = []
@@ -248,10 +271,7 @@ def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=No
     for c in df.columns:
         df[c] = df[c].astype(str).str.strip()
     result = (df, (add_source, src_col, source_map or {}))
-    _df_cache[file_id] = result
-    while len(_df_cache) > _CACHE_MAX:
-        _df_cache.pop(next(iter(_df_cache)))
-    return result
+    return _cache_put(file_id, result)
 
 
 # build_summary 已迁到 services.summary_builder，详见顶部 import。
@@ -542,7 +562,7 @@ def split():
         traceback.print_exc()
         return jsonify(ok=False, msg=f"处理异常：{e}", log=log), 500
     finally:
-        _df_cache.pop(file_id, None)  # 拆分完成即释放缓存
+        _cache_pop(file_id)  # 拆分完成即释放缓存（线程安全）
 
 
 @bp.route("/preview", methods=["POST"])
