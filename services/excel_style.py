@@ -290,7 +290,9 @@ def read_fill_map(path, sheet_names):
     try:
         with zipfile.ZipFile(path) as zf:
             style_colors = _style_fill_colors(zf)
-            if not style_colors:
+            if not style_colors or not any(style_colors):
+                # 整个工作簿没有任何实心填充（绝大多数情况）：直接返回，
+                # 省掉对 sheet XML 的全表扫描（5 万行约 1.3s -> 几毫秒）
                 return {}
             sheet_paths = _sheet_paths(zf)
             out = {}
