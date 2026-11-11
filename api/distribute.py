@@ -35,6 +35,7 @@ from services.masking import (
     mask_replace,
 )
 from services.summary_builder import build_summary, _to_num  # noqa: F401  _to_num 同名
+from services.excel_style import apply_fills, count_fills, read_fill_map
 
 
 # ----------------------------------------------------------------------------
@@ -159,20 +160,25 @@ def _col_meta(cols, df_sample):
     return meta
 
 
-def _sheet_to_df(wb, name, nrows=None):
-    """openpyxl 流式只读：把单个子表读成字符串 DataFrame，大文件不整体入内存。"""
+def _sheet_to_df(wb, name, nrows=None, with_layout=False):
+    """openpyxl 流式只读：把单个子表读成字符串 DataFrame，大文件不整体入内存。
+
+    with_layout=True 时额外返回 {列名: 源表列序号(1-based)}，供"保留单元格底色"
+    把新表列名换算回源表列位（子表可能跳过了空表头列，列位不能简单按顺序推）。
+    """
     ws = wb[name]
     it = ws.iter_rows(values_only=True)
     try:
         header = next(it)
     except StopIteration:
-        return pd.DataFrame()
+        return (pd.DataFrame(), {}) if with_layout else pd.DataFrame()
     # 只保留"表头非空"的列；表头为空的列视为无数据列，连同其下内容一并忽略
     keep_idx = [i for i, h in enumerate(header) if h is not None and str(h).strip() != ""]
     if not keep_idx:
-        return pd.DataFrame()
+        return (pd.DataFrame(), {}) if with_layout else pd.DataFrame()
     # 列名去重：重复列名（如两个"备注"）统一改成 列名、列名.1 …
     cols = []
+    col_pos = {}
     seen = {}
     for i in keep_idx:
         name = str(header[i]).strip()
@@ -182,6 +188,7 @@ def _sheet_to_df(wb, name, nrows=None):
         else:
             seen[name] = 0
         cols.append(name)
+        col_pos[name] = i + 1  # 源表列序号，1-based
     data = []
     excel_rows = []
     empty_streak = 0
@@ -212,7 +219,7 @@ def _sheet_to_df(wb, name, nrows=None):
             break
     frame = pd.DataFrame(data, columns=cols)
     frame.index = excel_rows  # 用 Excel 真实行号做下标，便于脏数据定位
-    return frame
+    return (frame, col_pos) if with_layout else frame
 
 
 def _clean(d):
@@ -232,11 +239,18 @@ def _clean(d):
 # 数据读取缓存：预览与拆分共用，大文件只解析一次
 # ----------------------------------------------------------------------------
 def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=None):
-    """读取并合并所选子表（含多表合并的「来源」列），带进程内缓存。"""
+    """读取并合并所选子表（含多表合并的「来源」列），带进程内缓存。
+
+    同时收集"保留底色"所需的两样信息：
+    - col_pos：{子表: {列名: 源表列序号}}，把列名换算回源表列位；
+    - fills：{(子表, excel行号): {列序号: 色值}}，按行稀疏存储。
+    这两样与 DataFrame 一起缓存，避免预览/拆分各解析一遍大文件。
+    """
     cached = _cache_get(file_id)
     if cached is not None:
         return cached
     frames = []
+    col_pos = {}
     if ext in (".xlsx", ".xlsm"):
         # 流式只读：一次打开，逐张读取选中子表
         from openpyxl import load_workbook
@@ -244,14 +258,22 @@ def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=No
         wb = load_workbook(path, read_only=True, data_only=True)
         try:
             for name in merge_sheets:
-                frames.append(_clean(_sheet_to_df(wb, name)))
+                frame, pos = _sheet_to_df(wb, name, with_layout=True)
+                col_pos[name] = pos
+                cleaned = _clean(frame)
+                cleaned["__sheet__"] = name  # 多表合并后仍需知道行来自哪张子表
+                frames.append(cleaned)
         finally:
             wb.close()
+        fills = read_fill_map(path, merge_sheets)
     else:
         for name in merge_sheets:
             d = pd.read_excel(path, sheet_name=name, dtype=str)
             d.index = [int(i) + 2 for i in d.index]
-            frames.append(_clean(d))
+            cleaned = _clean(d)
+            cleaned["__sheet__"] = name
+            frames.append(cleaned)
+        fills = {}  # csv / xls 无样式可还原
     add_source = len(merge_sheets) > 1
     if add_source:
         df = pd.concat(frames, keys=merge_sheets, sort=False)
@@ -270,7 +292,14 @@ def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=No
     # 全部按字符串并去除两端空格
     for c in df.columns:
         df[c] = df[c].astype(str).str.strip()
-    result = (df, (add_source, src_col, source_map or {}))
+    meta = {
+        "add_source": add_source,
+        "src_col": src_col,
+        "source_map": source_map or {},
+        "col_pos": col_pos,
+        "fills": fills,
+    }
+    result = (df, meta)
     return _cache_put(file_id, result)
 
 
@@ -424,7 +453,7 @@ def split():
             return jsonify(ok=False, msg="请选择要处理的子表"), 400
 
         df, meta = _prepare_df(path, file_id, ext, merge_sheets, cfg.get("source_col"), cfg.get("source_map"))
-        add_source, src_col, _ = meta
+        add_source, src_col = meta["add_source"], meta["src_col"]
 
         missing = [c for c in keep if c not in df.columns]
         if missing:
@@ -494,12 +523,21 @@ def split():
         groups = []
         values = list(dict.fromkeys(df[split_col].tolist()))  # 保持出现顺序
         used_names = {}
+        painted_total = 0  # 为日志统计：实际沿用了多少处源表底色
         for val in values:
-            detail = dfm[dfm[split_col] == val][keep].copy()
+            subset = dfm[dfm[split_col] == val]
             if sort_cols:  # 自动按文本维度排序，同类行聚在一起
-                detail = detail.sort_values(
+                subset = subset.sort_values(
                     by=sort_cols, kind="mergesort", na_position="last"
-                ).reset_index(drop=True)
+                )
+            # 底色按"源表行"锚定：排序会改变输出行序，必须与 detail 一起取行锚点，
+            # 否则颜色会跟错行。__row__ 是 _clean 写入的 Excel 真实行号。
+            row_keys = (
+                list(zip(subset["__sheet__"].astype(str), subset["__row__"].astype(int)))
+                if "__sheet__" in subset.columns and "__row__" in subset.columns
+                else []
+            )
+            detail = subset[keep].reset_index(drop=True)
             summary_df = (
                 build_summary(df[df[split_col] == val], sconf) if do_summary else None
             )
@@ -525,6 +563,11 @@ def split():
                                 for cell in ws[letter]:
                                     cell.number_format = "@"
                         _autofit_ws(ws)  # 明细列宽行高自适应
+                        # 沿用源表单元格底色（按行锚点 + 列位换算，排序后不串行）
+                        painted_total += apply_fills(
+                            ws, meta["fills"], row_keys, keep, meta["col_pos"],
+                            header_key=(merge_sheets[0], 1),
+                        )
                     if summary_df is not None:
                         summary_df.to_excel(writer, index=False, sheet_name="汇总")
                         _autofit_ws(writer.sheets["汇总"], bold_last=True)
@@ -542,6 +585,9 @@ def split():
             )
 
         log.append(f"共拆分 {len(groups)} 份，合计 {int(sum(g['rows'] for g in groups))} 行。")
+        fill_cells = count_fills(meta["fills"])
+        if fill_cells:
+            log.append(f"源表检测到 {fill_cells} 处单元格底色，导入文件已沿用 {painted_total} 处。")
         if do_summary and any(g["has_summary"] for g in groups):
             if include_detail:
                 log.append("每份文件含「明细」「汇总」两个 Sheet。")
