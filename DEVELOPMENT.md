@@ -242,6 +242,7 @@ excel-splitter/
 - [x] 运行历史表格列宽可收缩，表头不再竖排
 - [x] 清洗 / 计算 / 运行历史 接口失败时显示可见错误态与「重试」
 - [x] 清洗 / 计算 配置区与预览区窄屏上下排列（视口 ≤1180px）
+- [x] 浏览器标签页图标（内联 SVG，消除 `/favicon.ico` 404）
 
 #### 布局实现要点（改动前必看）
 - **面板动画不能依赖 opacity**：`.panel.show` 的 `@keyframes fade` 只做 `translateY` 位移。
@@ -304,8 +305,15 @@ excel-splitter/
 
 ### 7.3 数据源中心分类相关（待集中修）
 - **现象 1**：数据源卡片的「改分类」按钮偶发点击无反应
-- **现象 2**：「分类外面看一个，点进去看还是两个」——分类卡片的计数与分类内列表数量不一致
+- **现象 2**：「分类外面看一个，点进去看还是两个」——分类卡片计数与分类内列表数量不一致
 - **现象 3**：把文件改分类到「会员信息」后，又自己跑回「未分类」
+- **已定位根因（现象 2）**：`static/sources.js` 的 `renderCategories()` 用 `SRC.sources`
+  统计分类卡片的 `total / ready / pending / error`，而 `SRC.sources` 只装**当前页**
+  （默认 20 条）。所以卡片上的数字本质是"这一页里各分类各有几条"，不是全量。
+  实测：全库 152 个数据源、未分类 151 个，卡片却显示「20 个」。
+- **修复建议**：后端 `/api/categories` 补 `uncategorized_count`（或返回按状态分组的
+  `stats`），前端分类卡直接读接口值，不要再从当前页数据累加。现象 1 / 3 需要同时
+  检查 `SRC_confirmChangeCategory` 的异常分支与 `SRC.loadSources` 的刷新时序。
 - **状态**：用户已确认先记录、后续集中修复，本轮未动
 - **优先级**：中
 
@@ -325,7 +333,11 @@ excel-splitter/
 4. **大文件处理**：使用 openpyxl read_only 流式解析，避免内存溢出
 5. **前端 JS**：修改后必须用 `node --check` 验证语法
 6. **API 设计**：统一返回 `{ok: bool, msg?: str, data?: any}` 格式
-7. 详见 AGENTS.md
+7. **pytest 类级初始化**：普通测试类只认 `setup_class` / `teardown_class`；
+   写成 `setUpClass` 不会执行，类属性会一直是 `None`（表现为"前置数据不存在"整段 skip）。
+   另外 pytest 每个用例新建实例，跨用例的状态必须挂类属性，且测试数据要唯一命名 + 兜底清理。
+8. **DAO 返回类型**：`DictCursor.fetchall()` 返回 tuple，对外暴露的 DAO 方法统一转 list。
+9. 详见 AGENTS.md
 
 ---
 

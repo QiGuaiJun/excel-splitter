@@ -258,7 +258,9 @@ class CollectionLogDAO:
         sql = "SELECT * FROM collection_logs WHERE source_id = %s ORDER BY created_at DESC, id DESC LIMIT %s"
         with cursor() as cur:
             cur.execute(sql, (source_id, limit))
-            return cur.fetchall()
+            # DictCursor 的 fetchall() 返回 tuple；统一成 list，调用方才能安全地
+            # 做判空 / 追加 / 排序等列表操作（级联删除后这里必须是空列表）。
+            return list(cur.fetchall())
 
     @staticmethod
     def create(source_id, status, row_count=0, error_msg=None, duration_ms=0):

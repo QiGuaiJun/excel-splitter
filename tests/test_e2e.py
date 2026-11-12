@@ -13,7 +13,9 @@ DB 不可达时整个文件 skip；服务未启动时用例 marker-skip（标记
 import io
 import json
 import socket
+import urllib.error
 import urllib.request
+import uuid
 
 import pandas as pd
 import pytest
@@ -79,10 +81,41 @@ def http_post_multipart(path, fields, files):
 # ============================================================================
 @pytest.mark.integration
 class TestFullLifecycle:
+    """按业务顺序串起来的全链路用例。
+
+    pytest 默认给每个 test 方法新建一个实例，``self.xxx`` 无法跨方法传递，
+    所以前置产物（分类 id、数据源 id）必须挂在类属性上。
+    """
+
+    cat_id = None
+    src_id = None
+    category_name = None
+
+    @classmethod
+    def setup_class(cls):
+        """pytest 风格的类级初始化（非 unittest 类不识别 setUpClass）。"""
+        cls.cat_id = None
+        cls.src_id = None
+        # 分类名有唯一约束：固定名字在第二次运行时会被 400 拒绝。
+        cls.category_name = f"E2E测试分类-{uuid.uuid4().hex[:6]}"
+
+    @classmethod
+    def teardown_class(cls):
+        """兜底清理：即使中途某步失败没走到 test_cleanup，也不在库里留测试数据。"""
+        for path in ([f"/api/sources/{cls.src_id}"] if cls.src_id else []) + (
+            [f"/api/categories/{cls.cat_id}"] if cls.cat_id else []
+        ):
+            try:
+                req = urllib.request.Request(BASE + path, method="DELETE")
+                with urllib.request.urlopen(req, timeout=10):
+                    pass
+            except Exception:
+                pass
+
     def test_create_category(self):
-        r = http_post_json("/api/categories", {"name": "E2E测试分类"})
+        r = http_post_json("/api/categories", {"name": type(self).category_name})
         assert r["ok"], r
-        self.cat_id = r["data"]["id"]
+        type(self).cat_id = r["data"]["id"]
 
     def test_upload_excel(self):
         df = pd.DataFrame([
@@ -101,7 +134,7 @@ class TestFullLifecycle:
         assert r["data"]["row_count"] == 2
         assert r["data"]["col_count"] == 5
         assert r["data"]["sheet_names"] == ["明细"]
-        self.src_id = r["data"]["id"]
+        type(self).src_id = r["data"]["id"]
 
     def test_list_sources_contains_created(self):
         r = http_get("/api/sources")
@@ -146,6 +179,7 @@ class TestFullLifecycle:
 
 
 # ============================================================================
-# 注意：pytest 的默认顺序按字典序执行类内方法；如果想强制顺序，加 pytest-order
-# 或把全链路用例合并到一个 test 方法里。当前 setup/teardown 用 self.xxx 传递数据。
+# 注意：本类用例按定义顺序串成一条链路（分类 → 采集 → 列表 → 预览 → 重采 → 清理）。
+# pytest 默认给每个方法新建实例，前置产物挂在类属性上（setUpClass 重置、
+# tearDownClass 兜底清理），不要改回 self.xxx。
 # ============================================================================
