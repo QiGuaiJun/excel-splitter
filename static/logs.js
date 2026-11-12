@@ -52,8 +52,25 @@
         LOG.total_pages = j.pagination.total_pages;
         renderList();
         renderPagination();
+      } else {
+        renderLoadError(j.msg || "接口返回异常");
       }
-    }catch(e){ toast("加载日志失败", "err"); }
+    }catch(e){
+      renderLoadError("后端返回异常（通常是数据库未就绪）");
+    }
+  }
+
+  // 列表加载失败时的可见提示（避免只剩一条空白占位条）
+  function renderLoadError(msg){
+    const el = $("logList");
+    if(!el) return;
+    $("logPagination").innerHTML = "";
+    el.innerHTML = `<div class="empty-state"><div class="big">⚠️</div>
+      <div>运行记录读取失败</div>
+      <div style="font-size:12.5px;margin-top:8px;color:#c0392b">${esc(msg)}</div>
+      <div style="font-size:12px;margin-top:6px">请确认后端服务与数据库连接正常后重试</div>
+      <button class="btn btn-ghost" type="button" style="margin-top:14px" onclick="LOG_refresh()">重试</button>
+    </div>`;
   }
 
   // 渲染列表
@@ -61,7 +78,10 @@
     const el = $("logList");
     if(!el) return;
     if(LOG.list.length === 0){
-      el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--faint)">暂无运行记录</div>`;
+      el.innerHTML = `<div class="empty-state"><div class="big">🗂️</div>
+        <div>暂无运行记录</div>
+        <div style="font-size:12.5px;margin-top:6px">采集、清洗、计算、分发执行后会自动记录在这里</div>
+      </div>`;
       return;
     }
     el.innerHTML = LOG.list.map(log => {

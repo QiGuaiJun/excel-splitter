@@ -19,17 +19,31 @@
       const r = await fetch("/api/calc/tasks");
       const j = await r.json();
       if(j.ok) renderTasks(j.data);
-    }catch(e){ toast("加载计算任务失败", "err"); }
+      else renderLoadError(j.msg || "接口返回异常");
+    }catch(e){
+      renderLoadError("后端返回异常（通常是数据库未就绪）");
+    }
+  }
+
+  // 列表加载失败时的可见提示（避免整块区域留白）
+  function renderLoadError(msg){
+    const el = $("calcTaskList");
+    if(!el) return;
+    el.innerHTML = `<div class="empty-state"><div class="big">⚠️</div>
+      <div>计算任务列表读取失败</div>
+      <div style="font-size:12.5px;margin-top:8px;color:#c0392b">${esc(msg)}</div>
+      <div style="font-size:12px;margin-top:6px">请确认后端服务与数据库连接正常后重试</div>
+      <button class="btn btn-ghost" type="button" style="margin-top:14px" onclick="CA_refresh()">重试</button>
+    </div>`;
   }
 
   function renderTasks(tasks){
     const el = $("calcTaskList");
     if(!el) return;
     if(tasks.length === 0){
-      el.innerHTML = `<div style="text-align:center;padding:40px;color:#7a8a86">
-        <div style="font-size:40px;margin-bottom:12px">🧮</div>
+      el.innerHTML = `<div class="empty-state"><div class="big">🧮</div>
         <div>暂无计算任务</div>
-        <div style="font-size:12.5px;margin-top:6px">点击右上角"新建计算任务"开始</div>
+        <div style="font-size:12.5px;margin-top:6px">点击右上角「新建计算任务」开始</div>
       </div>`;
       return;
     }
@@ -325,4 +339,7 @@
   };
 
   window.CA_init = function(){ loadTasks(); };
+
+  // 重新拉取任务列表
+  window.CA_refresh = function(){ loadTasks(); };
 })();

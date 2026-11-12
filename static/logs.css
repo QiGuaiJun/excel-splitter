@@ -66,12 +66,14 @@
   background: #fff;
   border: 1px solid #e2e8e6;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+/* 列宽可收缩：容器变窄时优先压缩内容列，不再把表头文字挤成竖排 */
 .log-header {
   display: grid;
-  grid-template-columns: 180px 1fr 100px 80px 80px 80px;
+  grid-template-columns: minmax(112px, 140px) minmax(0, 1fr) 84px 66px 62px 66px;
   gap: 12px;
   padding: 12px 16px;
   background: #f7faf9;
@@ -79,10 +81,16 @@
   font-size: 12.5px;
   font-weight: 600;
   color: #7a8a86;
+  align-items: center;
+}
+.log-header > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .log-row {
   display: grid;
-  grid-template-columns: 180px 1fr 100px 80px 80px 80px;
+  grid-template-columns: minmax(112px, 140px) minmax(0, 1fr) 84px 66px 62px 66px;
   gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid #f0f4f3;
@@ -110,6 +118,7 @@
 .log-duration { color: #7a8a86; font-family: Consolas, monospace; font-size: 12.5px; }
 
 /* 分页 */
+.log-pagination:empty { display: none; }
 .log-pagination {
   display: flex;
   justify-content: space-between;

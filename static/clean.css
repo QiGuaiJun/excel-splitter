@@ -46,7 +46,7 @@
 /* 新建清洗工作区 */
 .clean-workspace {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -201,8 +201,8 @@
   border-top: 1px solid #f0f4f3;
 }
 
-/* 响应式 */
-@media (max-width: 900px) {
-  .clean-workspace { grid-template-columns: 1fr; }
-  .preview-compare { grid-template-columns: 1fr; }
+/* 响应式：内容区宽度 = 视口 - 侧边栏(250) - 内边距(80)，窄屏下配置与预览改为上下排列 */
+@media (max-width: 1180px) {
+  .clean-workspace { grid-template-columns: minmax(0, 1fr); }
+  .preview-compare { grid-template-columns: minmax(0, 1fr); }
 }

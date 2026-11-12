@@ -72,7 +72,7 @@
 /* 工作区 */
 .calc-workspace {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -179,7 +179,7 @@
   border-top: 1px solid #f0f4f3;
 }
 
-/* 响应式 */
-@media (max-width: 900px) {
-  .calc-workspace { grid-template-columns: 1fr; }
+/* 响应式：窄屏下配置与预览改为上下排列 */
+@media (max-width: 1180px) {
+  .calc-workspace { grid-template-columns: minmax(0, 1fr); }
 }

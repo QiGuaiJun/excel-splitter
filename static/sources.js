@@ -36,17 +36,19 @@
 
   /* ---------- 模块切换（数据驱动） ---------- */
   // 模块元数据：每个模块声明自己的面包屑 / 标题 / 上一步下一步可见性 / 进入时调用哪个 init
+  // 注意：initName 用字符串惰性解析 —— 本文件先于 clean.js / calc.js / logs.js 加载，
+  // 直接写 typeof CL_init === "function" 会在加载期恒为 false，导致模块永不初始化。
   const MODULES = {
     sources:    { crumb: "数据采集", title: "数据源管理中心", navId: "navSources",
-                  initFn: () => loadAll(), showStepNav: false },
+                  initFn: () => loadAll(), initName: null, showStepNav: false },
     distribute: { crumb: "数据链路", title: "数据分发",       navId: "navDistribute",
-                  initFn: null, showStepNav: true  },
+                  initFn: null, initName: null, showStepNav: true  },
     logs:       { crumb: "运维",      title: "运行历史",       navId: "navLogs",
-                  initFn: typeof LOG_init === "function" ? LOG_init : null, showStepNav: false },
+                  initFn: null, initName: "LOG_init",    showStepNav: false },
     clean:      { crumb: "数据链路", title: "数据清洗",       navId: "navClean",
-                  initFn: typeof CL_init === "function" ? CL_init : null, showStepNav: false },
+                  initFn: null, initName: "CL_init",     showStepNav: false },
     calc:       { crumb: "数据链路", title: "数据计算",       navId: "navCalc",
-                  initFn: typeof CA_init === "function" ? CA_init : null, showStepNav: false },
+                  initFn: null, initName: "CA_init",     showStepNav: false },
   };
 
   window.goModule = function(mod){
@@ -72,7 +74,10 @@
       if(prev) prev.style.visibility = cfg.showStepNav ? "visible" : "hidden";
       if(next) next.style.display = cfg.showStepNav ? "" : "none";
       // 调用模块自己的 init 函数（如果声明了）
-      if(typeof cfg.initFn === "function") cfg.initFn();
+      const initFn = (typeof cfg.initFn === "function")
+        ? cfg.initFn
+        : (cfg.initName && typeof window[cfg.initName] === "function" ? window[cfg.initName] : null);
+      if(typeof initFn === "function") initFn();
     }
 
     // 导航高亮
