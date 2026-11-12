@@ -193,6 +193,49 @@ class TestNormalSplit:
 
 
 # ----------------------------------------------------------------------------
+# 正则表达式脱敏：文本里"姓名 + 手机号"混排，只动号码
+# ----------------------------------------------------------------------------
+@pytest.mark.integration
+class TestRegexMaskE2E:
+    _ROWS = [
+        ["张伟", "张伟 13812345678", "义乌市场"],
+        ["李娜", "李娜13812345679", "义乌市场"],
+        ["王芳", "王芳 330782199001011234", "杭州市场"],  # 身份证不应被手机号正则误伤
+    ]
+
+    def test_inline_phone_masked_name_kept(self, client, out_dir):
+        file_id = _post_excel(client, pd.DataFrame(self._ROWS, columns=["客户姓名", "联系方式", "市场"]), sheet_name="S")
+        r = client.post("/api/split", json={
+            "file_id": file_id, "sheet": "S",
+            "keep_columns": ["客户姓名", "联系方式", "市场"],
+            "mask": {"联系方式": {"type": "regex", "pattern": r"(?<!\d)1[3-9]\d{9}(?!\d)", "a": 3, "b": 4}},
+            "split_column": "市场", "suffix": "正则测试", "output_dir": out_dir,
+        }).get_json()
+        assert r["ok"], r.get("msg")
+
+        yw = pd.read_excel(os.path.join(out_dir, "义乌市场正则测试.xlsx"), dtype=str).set_index("客户姓名")
+        assert yw.loc["张伟", "联系方式"] == "张伟 138****5678"
+        assert yw.loc["李娜", "联系方式"] == "李娜138****5679"
+
+        hz = pd.read_excel(os.path.join(out_dir, "杭州市场正则测试.xlsx"), dtype=str).iloc[0]
+        assert hz["联系方式"] == "王芳 330782199001011234"
+
+    def test_invalid_regex_returns_400(self, client, out_dir):
+        file_id = _post_excel(client, pd.DataFrame(self._ROWS, columns=["客户姓名", "联系方式", "市场"]), sheet_name="S")
+        resp = client.post("/api/split", json={
+            "file_id": file_id, "sheet": "S",
+            "keep_columns": ["客户姓名", "联系方式", "市场"],
+            "mask": {"联系方式": {"type": "regex", "pattern": "1[3-9"}},
+            "split_column": "市场", "suffix": "正则测试", "output_dir": out_dir,
+        })
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["ok"] is False
+        assert "正则" in body["msg"]
+        assert os.listdir(out_dir) == []
+
+
+# ----------------------------------------------------------------------------
 # 脏数据：拆分列含空 / 多值 -> 整体中止，不生成任何文件
 # ----------------------------------------------------------------------------
 @pytest.mark.integration

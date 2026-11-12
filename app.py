@@ -56,11 +56,13 @@ app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 最大 512MB
 from services.masking import (  # noqa: E402, F401
     RULES,
     apply_mask,
+    compile_pattern,
     mask_address,
     mask_idcard,
     mask_keep_ab,
     mask_name,
     mask_phone,
+    mask_regex,
     mask_replace,
 )
 from services.summary_builder import build_summary, _to_num  # noqa: E402, F401

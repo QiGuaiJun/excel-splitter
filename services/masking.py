@@ -11,10 +11,16 @@ URL：
 - name       姓名：保留姓，其余 *
 - keep_ab    自定义前后各 a/b 位
 - replace    整列统一替换
+- regex      按正则找出文内片段再部分打星（如"张三13812345678"只动号码，姓名保留）
 """
 import re
 
 import pandas as pd
+
+# 「正则表达式」规则的默认匹配式：中国大陆 11 位手机号。
+# 用 lookaround 卡住前后边界，避免从 18 位身份证等长数字串里截出"手机号"
+# （如 330782199001011234 中间一段会被裸正则误命中）。
+DEFAULT_TEXT_PATTERN = r"(?<!\d)1[3-9]\d{9}(?!\d)"
 
 
 def _digits(s: str) -> str:
@@ -109,6 +115,47 @@ def mask_replace(v, text="***"):
     return text or "***"
 
 
+def compile_pattern(pattern):
+    """编译用户填的正则；为空则用内置手机号匹配式。非法返回 None。"""
+    try:
+        return re.compile(pattern or DEFAULT_TEXT_PATTERN)
+    except re.error:
+        return None
+
+
+def _mask_fragment(text, a, b):
+    """对正则命中的片段保留前 a 后 b 个字符，中间打星。"""
+    n = len(text)
+    if n <= a + b:
+        return "*" * n
+    return text[:a] + "*" * (n - a - b) + (text[-b:] if b else "")
+
+
+def _regex_apply(v, rx, a, b):
+    if v is None:
+        return v
+    if isinstance(v, float) and pd.isna(v):
+        return ""
+    s = str(v)
+    if s.strip() == "":
+        return ""
+    return rx.sub(lambda m: _mask_fragment(m.group(0), a, b), s)
+
+
+def mask_regex(v, pattern=None, a=3, b=4):
+    """在文本中按正则定位片段并部分打星，未命中的文字（如客户姓名）原样保留。
+
+    mask_regex("张三 13812345678") -> "张三 138****5678"
+    """
+    rx = compile_pattern(pattern)
+    if rx is None:
+        # 非法正则不阻断整列，原样返回（API 层会提前校验并给出明确报错）
+        return v if v is None else str(v)
+    a = 3 if a is None else int(a)
+    b = 4 if b is None else int(b)
+    return _regex_apply(v, rx, a, b)
+
+
 # 规则注册表（type -> ("显示名称", 函数)）
 RULES = {
     "phone":   ("手机号(前3后4)", mask_phone),
@@ -125,6 +172,7 @@ def apply_mask(series: pd.Series, rule: dict) -> pd.Series:
     - phone / idcard / address / name: 用 RULES 注册的函数
     - keep_ab: 自定义前后保留 a/b 位
     - replace: 整列替换为 text (默认 "***")
+    - regex:   按 pattern 在文本内定位片段，保留前 a 后 b 位（默认手机号 + 3/4）
     - 其它 / type 为空: 走 mask_replace 兜底
     """
     t = rule.get("type")
@@ -132,5 +180,12 @@ def apply_mask(series: pd.Series, rule: dict) -> pd.Series:
         return series.map(lambda x: mask_keep_ab(x, rule.get("a", 0), rule.get("b", 0)))
     if t == "replace":
         return series.map(lambda x: mask_replace(x, rule.get("text", "***")))
+    if t == "regex":
+        rx = compile_pattern(rule.get("pattern"))
+        if rx is None:
+            return series
+        a = 3 if rule.get("a") is None else int(rule.get("a"))
+        b = 4 if rule.get("b") is None else int(rule.get("b"))
+        return series.map(lambda x: _regex_apply(x, rx, a, b))
     fn = RULES.get(t, (None, mask_replace))[1]
     return series.map(fn)

@@ -2,7 +2,7 @@
 """脱敏函数单元测试。
 
 覆盖：
-- 手机号 / 身份证 / 地址 / 姓名 / 通用前后保留 / 整体替换 六种规则
+- 手机号 / 身份证 / 地址 / 姓名 / 通用前后保留 / 整体替换 / 正则识别 七种规则
 - apply_mask 对 Series 的封装
 - 边界：None、空串、NaN、过短号码、含非数字字符
 """
@@ -13,11 +13,13 @@ import pytest
 
 from app import (
     apply_mask,
+    compile_pattern,
     mask_address,
     mask_idcard,
     mask_keep_ab,
     mask_name,
     mask_phone,
+    mask_regex,
     mask_replace,
 )
 
@@ -161,6 +163,57 @@ class TestKeepAbReplace:
 
 
 # ----------------------------------------------------------------------------
+# mask_regex / compile_pattern
+# ----------------------------------------------------------------------------
+class TestMaskRegex:
+    """核心场景：一格里"客户姓名 + 手机号"混排，只动号码，姓名原样保留。"""
+
+    def test_name_and_phone_keep_name(self):
+        assert mask_regex("张三 13812345678") == "张三 138****5678"
+
+    def test_no_separator(self):
+        assert mask_regex("张三13812345678") == "张三138****5678"
+
+    def test_name_after_phone(self):
+        assert mask_regex("13812345678（张三）") == "138****5678（张三）"
+
+    def test_multiple_phones_in_one_cell(self):
+        assert mask_regex("张三 13812345678 / 李四 13998765432") == "张三 138****5678 / 李四 139****5432"
+
+    def test_text_without_phone_untouched(self):
+        assert mask_regex("张三 已加微信") == "张三 已加微信"
+
+    def test_chinese_name_with_punct_and_spaces(self):
+        assert mask_regex("客户：欧阳娜娜，联系方式 138-1234-5678") == "客户：欧阳娜娜，联系方式 138-1234-5678"
+
+    def test_idcard_not_mistaken_as_phone(self):
+        # 默认式带前后数字边界，18 位身份证里不会被截出"手机号"
+        assert mask_regex("330782199001011234") == "330782199001011234"
+
+    def test_idcard_beside_phone(self):
+        assert mask_regex("张三 330782199001011234 13812345678") == "张三 330782199001011234 138****5678"
+
+    def test_custom_pattern(self):
+        assert mask_regex("订单 A123456789 已完成", pattern=r"A\d{9}", a=1, b=3) == "订单 A******789 已完成"
+
+    def test_zero_keep_masks_whole_fragment(self):
+        assert mask_regex("13812345678", a=0, b=0) == "*" * 11
+
+    def test_invalid_pattern_keeps_original(self):
+        assert mask_regex("张三 13812345678", pattern="1[3-9") == "张三 13812345678"
+
+    def test_compile_pattern_returns_none_for_invalid(self):
+        assert compile_pattern("1[3-9") is None
+        assert compile_pattern("") is not None  # 空串走内置手机号式
+
+    def test_none_nan_empty(self):
+        assert mask_regex(None) is None
+        assert mask_regex(float("nan")) == ""
+        assert mask_regex("") == ""
+        assert mask_regex("   ") == ""
+
+
+# ----------------------------------------------------------------------------
 # apply_mask + RULES 注册表
 # ----------------------------------------------------------------------------
 class TestApplyMask:
@@ -193,3 +246,18 @@ class TestApplyMask:
         s = pd.Series(["abc"])
         out = apply_mask(s, {"type": None})  # 无规则 -> 走 default replace
         assert out.tolist() == ["***"]
+
+    def test_regex_rule_default_phone(self):
+        s = pd.Series(["张三 13812345678", "李四 已加微信"])
+        out = apply_mask(s, {"type": "regex"})
+        assert out.tolist() == ["张三 138****5678", "李四 已加微信"]
+
+    def test_regex_rule_explicit_pattern(self):
+        s = pd.Series(["张三 13812345678", "李四 13998765432"])
+        out = apply_mask(s, {"type": "regex", "pattern": r"(?<!\d)1[3-9]\d{9}(?!\d)", "a": 3, "b": 4})
+        assert out.tolist() == ["张三 138****5678", "李四 139****5432"]
+
+    def test_regex_rule_invalid_pattern_is_passthrough(self):
+        s = pd.Series(["张三 13812345678"])
+        out = apply_mask(s, {"type": "regex", "pattern": "1[3-9"})
+        assert out.tolist() == ["张三 13812345678"]

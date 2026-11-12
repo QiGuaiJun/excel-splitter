@@ -25,8 +25,10 @@ from flask import Blueprint, request, jsonify
 
 # 批次 6：业务层放 services/*，本模块只做路由 + IO。
 from services.masking import (
+    DEFAULT_TEXT_PATTERN,
     RULES,
     apply_mask,
+    compile_pattern,
     mask_address,
     mask_idcard,
     mask_keep_ab,
@@ -492,6 +494,11 @@ def split():
         include_detail = bool(cfg.get("include_detail", True))
 
         # ---------- 脱敏（在副本上进行，原始 df 留给汇总统计，保证金额/单数准确）----------
+        # 正则规则先校验：写错了要让用户看到明确报错，而不是整列静默没脱敏
+        for col, rule in masks.items():
+            if col in keep and rule.get("type") == "regex" and compile_pattern(rule.get("pattern")) is None:
+                return jsonify(ok=False, msg=f"字段「{col}」的正则表达式无效：{rule.get('pattern') or ''}"), 400
+
         dfm = df.copy()
         mask_info = []
         for col, rule in masks.items():
@@ -502,6 +509,12 @@ def split():
                     label = f"保留前{rule.get('a',0)}后{rule.get('b',0)}位"
                 elif rule["type"] == "replace":
                     label = f"替换为“{rule.get('text','***')}”"
+                elif rule["type"] == "regex":
+                    pat = rule.get("pattern") or DEFAULT_TEXT_PATTERN
+                    a = 3 if rule.get("a") is None else rule.get("a")
+                    b = 4 if rule.get("b") is None else rule.get("b")
+                    prefix = "文内手机号" if pat == DEFAULT_TEXT_PATTERN else "正则识别"
+                    label = f"{prefix}（保留前{a}后{b}位）"
                 mask_info.append(f"{col}：{label}")
 
         # ---------- 明细自动排序键：文本维度列（分组字段优先），数值/脱敏列不参与 ----------
