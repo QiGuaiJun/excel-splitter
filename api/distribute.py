@@ -45,6 +45,10 @@ from services.excel_style import apply_fills, count_fills, read_fill_map
 # ----------------------------------------------------------------------------
 bp = Blueprint("distribute", __name__)
 
+# 汇总 Sheet 的标签颜色（Excel 的 tabColor，ARGB）。红色是刻意选的：明细是数据、
+# 汇总是结论，发给市场/顾问后一眼就能点到要看的那一页。
+SUMMARY_TAB_COLOR = "FFFF0000"
+
 
 # 拆分流程的 DataFrame 进程内缓存（按 file_id 缓存，避免预览/拆分重复读取）。
 # 注意：app.run 单进程下 dict 本身是 thread-safe（CPython GIL），但显式加锁让
@@ -583,7 +587,10 @@ def split():
                         )
                     if summary_df is not None:
                         summary_df.to_excel(writer, index=False, sheet_name="汇总")
-                        _autofit_ws(writer.sheets["汇总"], bold_last=True)
+                        ws_sum = writer.sheets["汇总"]
+                        # 汇总表标签设红色：文件发出去后，一眼区分「明细」和「汇总」
+                        ws_sum.sheet_properties.tabColor = SUMMARY_TAB_COLOR
+                        _autofit_ws(ws_sum, bold_last=True)
             except Exception as e:
                 log.append(f"写入 {fname} 失败：{e}")
                 return jsonify(ok=False, msg=f"写入文件失败：{e}", log=log), 500

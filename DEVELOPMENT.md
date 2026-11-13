@@ -203,6 +203,7 @@ excel-splitter/
 - [x] 脏数据处理（中止并列真实行号）
 - [x] 仅汇总不输出明细
 - [x] 明细保留源表单元格底色（.xlsx/.xlsm 实心填充；自动排序后不串行）
+- [x] 汇总表标签红色（Excel tabColor，明细标签保持默认，发给对方后一眼区分）
 
 #### 单元格底色保留的实现要点
 - **读取**：`services/excel_style.py` 直接解 OOXML（`styles.xml` 取色 + `iterparse` 流式扫
@@ -344,9 +345,22 @@ excel-splitter/
 ## 九、启动方式
 
 ### 9.1 启动 MySQL（测试实例）
-```bash
-"D:\mysql\mysql\mysql-8.0.44-winx64\bin\mysqld.exe" --datadir="D:\mysql\test-instance\data" --port=3307 --bind-address=127.0.0.1
+测试实例已注册为 Windows 服务 **`MySQLTest3307`**（端口 3307、`datadir=D:/mysql/test-instance/data`、
+配置文件 `D:/mysql/test-instance/my.ini`），随系统自动启动。
+
+```powershell
+Get-Service -Name MySQLTest3307        # 查看状态
+Start-Service -Name MySQLTest3307      # 启动
+Restart-Service -Name MySQLTest3307    # 重启
 ```
+
+**两个坑（都踩过）**：
+- `my.ini` 里的路径必须写正斜杠或双反斜杠。MySQL 选项文件会把 `\t`、`\n` 当转义，
+  写成 `D:\mysql\test-instance\data` 会被解析成 `D:\mysql<TAB>est-instance\data`，
+  服务启动时报 `Failed to set datadir ... Invalid argument`。
+- 不要再用 `Start-Process mysqld ...` 临时起实例：进程会随命令所在的会话结束被回收，
+  跑一阵子就悄悄挂掉（日志里连 shutdown 记录都没有），表现是测试突然全部 skip、
+  页面显示"列表读取失败"。要长期可用就走服务。
 
 ### 9.2 启动工作台
 ```bash

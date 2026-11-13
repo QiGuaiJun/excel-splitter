@@ -439,6 +439,29 @@ class TestSummaryShaping:
         assert set(wb2.sheetnames) == {"明细", "汇总"}
         assert wb2["明细"].max_row == 5  # 表头 + 4 行
 
+    def test_summary_sheet_tab_is_red(self, client, out_dir):
+        """汇总 Sheet 的标签必须是红色，明细标签保持默认。
+
+        用途：文件发给市场/顾问后，在 Excel 底部一眼就能点到「汇总」那页。
+        """
+        from openpyxl import load_workbook
+        f = self._run(client, out_dir, "tabcolor", True, [{"col": "健康顾问"}])
+        wb = load_workbook(f)
+        tab = wb["汇总"].sheet_properties.tabColor
+        assert tab is not None and str(tab.rgb).upper().endswith("FF0000"), \
+            f"汇总标签颜色不是红色：{tab}"
+        detail_tab = wb["明细"].sheet_properties.tabColor
+        assert detail_tab is None or str(detail_tab.rgb) in ("None", "00000000")
+
+    def test_summary_only_sheet_tab_is_red(self, client, out_dir):
+        """只输出汇总（不含明细）时，唯一的那张表同样要保持红标签。"""
+        from openpyxl import load_workbook
+        f = self._run(client, out_dir, "tabonly", False, [{"col": "健康顾问"}])
+        wb = load_workbook(f)
+        assert wb.sheetnames == ["汇总"]
+        tab = wb["汇总"].sheet_properties.tabColor
+        assert tab is not None and str(tab.rgb).upper().endswith("FF0000")
+
     def test_no_group_one_total_row(self, client, out_dir):
         from openpyxl import load_workbook
         fc = self._run(client, out_dir, "nogroup", False, [])
