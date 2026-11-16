@@ -633,28 +633,29 @@ function renderSheets(){
   };
   document.querySelectorAll(".srcval").forEach(inp=>inp.oninput=e=>S.srcMap[e.target.dataset.sheet]=e.target.value);
 }
-/* 源文件名 → 后缀联想：去扩展名、去「副本/(1)/导出」噪音、日期统一成（MMDD） */
+/* 源文件名 → 后缀联想：去扩展名、去「副本/(1)/导出」噪音、剥掉旧日期，统一追加当日（MMDD） */
+function todayStamp(){
+  const d=new Date();
+  return String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+}
 function smartSuffix(name){
   if(!name)return "";
   let base=String(name).replace(/\.(xlsx|xlsm|xls|csv)$/i,"").trim();
   base=base.replace(/[\s_-]*(?:副本|copy|导出|导出数据|导出结果|数据导出)\s*$/i,"").trim();
-  base=base.replace(/[\s_-]*[（(]\d{1,2}[)）]\s*$/,"").trim();          // 去掉 (1)(12)，不动（0826）
-  if(!base)return "";
-  if(/[（(]\d{4}[)）]\s*$/.test(base))return base;                      // 已是（0826），原样保留
-  let md="";
+  base=base.replace(/[\s_-]*[（(]\d{1,2}[)）]\s*$/,"").trim();          // 去掉 (1)(12)
+  base=base.replace(/[（(]\d{4}[)）]\s*$/,"").trim();                    // 剥掉旧日期（0826）
   base=base.replace(/(20\d{2})\s*[-./年]\s*(\d{1,2})\s*[-./月]\s*(\d{1,2})\s*日?/,
-    (m,y,mo,d)=>{md=String(mo).padStart(2,"0")+String(d).padStart(2,"0");return ""}).trim();
-  const m8=base.match(/(20\d{2})(\d{2})(\d{2})/);
-  if(!md&&m8){md=m8[2]+m8[3];base=base.replace(m8[0],"")}
+    (m,y,mo,d)=>(+mo>=1&&+mo<=12&&+d>=1&&+d<=31)?"":m).trim();           // 2026-08-26
+  base=base.replace(/(20\d{2})(\d{2})(\d{2})/,
+    (m,y,mo,d)=>(+mo>=1&&+mo<=12&&+d>=1&&+d<=31)?"":m).trim();           // 20260826
   base=base.replace(/[\s\-_.]+$/,"").trim();
-  if(!base&&!md)return "";
-  return md?(base?base+"（"+md+"）":"（"+md+"）"):base;
+  return base?base+"（"+todayStamp()+"）":"（"+todayStamp()+"）";
 }
 function applySuffixHint(){
   const hint=$("suffixHint");if(!hint)return;
   const fn=S.data&&S.data.filename;
   hint.textContent=S.suffix
-    ?(S.suffixAuto&&fn?`已按源文件名「${fn}」联想，可自行修改（可加 - 分隔）`:"当前后缀由你填写")
+    ?(S.suffixAuto&&fn?`已按源文件名「${fn}」联想，尾部用今日日期（${todayStamp()}），可自行修改`:"当前后缀由你填写")
     :"后缀为空，输出文件名只保留拆分值";
 }
 function fillSuffix(v,auto){
@@ -664,7 +665,10 @@ function fillSuffix(v,auto){
   applySuffixHint();
 }
 function ensureSuffix(){
-  if(!S.suffix){const v=smartSuffix(S.data&&S.data.filename);if(v)fillSuffix(v,true)}
+  // 自动联想值每次都按"今天"重算（跨天使用时日期不会停在旧值）；用户手填值不动
+  if(!S.suffix||S.suffixAuto){
+    const v=smartSuffix(S.data&&S.data.filename);if(v)fillSuffix(v,true);
+  }
   applySuffixHint();
 }
 function initCfg(){

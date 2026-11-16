@@ -117,6 +117,10 @@ def test_suffix_ai_suggest():
     assert 'id="bSuffixSmart"' in html and 'id="bSuffixClear"' in html
     # 日期统一成（MMDD），常见噪音（副本/(1)/导出）要去掉
     assert "副本" in html and "20\\d{2}" in html
+    # 后缀尾部统一用"当日"日期（如 1116），文件名里的旧日期要被替换而不是叠加
+    assert "function todayStamp()" in html
+    assert 'base+"（"+todayStamp()+"）"' in html
+    assert "if(!S.suffix||S.suffixAuto)" in html, "自动联想值每次进第 4 步要按当天重算"
 
 
 def test_sum_fields_can_be_reordered():
