@@ -87,10 +87,12 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .fcard .fk input{width:16px;height:16px;accent-color:var(--primary);flex:none}
 .fcard .fmeta{display:flex;gap:6px;flex-wrap:wrap}
 .fcard .fk .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* 汇总字段拖拽排序：按住卡片 / 行拖动就能换位置 */
-.gcard[draggable="true"],#sumMetricBody tr[draggable="true"]{cursor:grab}
-.gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing}
-.gcard.dragging,#sumMetricBody tr.dragging{pointer-events:none}
+/* 汇总字段拖拽排序：按住卡片 / 行（或左侧把手）拖动就能换位置 */
+.grip{flex:none;display:inline-flex;align-items:center;justify-content:center;width:14px;height:18px;
+  color:#a9c0bc;cursor:grab;user-select:none;border-radius:4px}
+.grip:hover{color:var(--primary);background:rgba(15,157,143,.1)}
+.gcard,#sumMetricBody tr{cursor:grab}
+.gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing;pointer-events:none}
 .drag-active,.drag-active *{user-select:none!important}
 .gcard{border-color:#cfe0ee}
 .gcard.on{border-color:#378add;background:#eef6fd}
@@ -418,7 +420,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
                   <div class="field-grid" id="sumGroupGrid"></div>
                 </div>
                 <div class="sub-block">
-                  <div class="lab"><span class="lab-t">数值指标</span> <span class="step-hint">勾选=参与汇总；类型可选求和 / 计数；手机号等编号列已自动排除 · 按住行拖动可调顺序</span></div>
+                  <div class="lab"><span class="lab-t">数值指标</span> <span class="step-hint">勾选=参与汇总；可选求和 / 计数；编号类列已自动排除 · 拖动行可调顺序</span></div>
                   <div class="table-wrap" style="margin-top:4px"><table>
                     <thead><tr><th>字段</th><th style="width:118px">类型</th><th>输出列名（可改）</th></tr></thead>
                     <tbody id="sumMetricBody"></tbody>
@@ -721,38 +723,45 @@ function orderList(cols,key){
   cols.forEach(c=>{if(!arr.includes(c))arr.push(c)});
   S[key]=arr;return arr;
 }
-// 汇总字段拖拽排序：按住卡片 / 行拖到目标位置，松手后写回顺序并重绘（预览跟着变）
-// 容器常驻、innerHTML 每次重绘，所以监听只绑一次，key / selector 存在容器上复用
+// 汇总字段拖拽排序：按住卡片 / 行（或左侧把手）拖动，松手写回顺序并重绘（预览跟着变）
+// 用 pointer 事件而不是 HTML5 drag —— 卡片大部分面积是 select，HTML5 drag 从控件上起手会被取消，
+// 用户就觉得"拖不动"；pointer 方案只排除 input/select/textarea，其余区域都能起手，触屏同样可用。
 function enableDragSort(container,selector,key){
   container.__sortKey=key;container.__sortSel=selector;
   if(container.__sortBound)return;
   container.__sortBound=true;
-  let src=null;
+  let src=null,active=false,sx=0,sy=0;
   const selOf=()=>container.__sortSel;
   const items=()=>[...container.querySelectorAll(selOf())];
-  container.addEventListener("dragstart",e=>{
-    const it=e.target.closest(selOf());
-    if(!it||e.target.closest("input,select,textarea,button")){e.preventDefault();return}
-    src=it;it.classList.add("dragging");document.body.classList.add("drag-active");
-    e.dataTransfer.effectAllowed="move";
-    try{e.dataTransfer.setData("text/plain",it.dataset.c)}catch(_){}
-  });
-  container.addEventListener("dragover",e=>{
-    if(!src)return;
-    e.preventDefault();e.dataTransfer.dropEffect="move";
-    const over=e.target.closest(selOf());
-    if(!over||over===src)return;
-    const r=over.getBoundingClientRect();
-    const after=(e.clientY-r.top)>r.height/2;   // 落在目标的下半区 = 插到它后面
-    container.insertBefore(src,after?over.nextSibling:over);
-  });
-  container.addEventListener("drop",e=>{if(src)e.preventDefault()});
-  container.addEventListener("dragend",()=>{
+  const finish=commit=>{
     if(!src)return;
     src.classList.remove("dragging");document.body.classList.remove("drag-active");
-    S[container.__sortKey]=items().map(el=>el.dataset.c);
-    src=null;renderSum();
+    const moved=active;src=null;active=false;
+    if(moved&&commit){S[container.__sortKey]=items().map(el=>el.dataset.c);renderSum()}
+  };
+  container.addEventListener("pointerdown",e=>{
+    if(e.button!==0)return;
+    if(e.target.closest("input,select,textarea,button"))return;  // 控件上按下 = 正常操作，不起拖
+    const it=e.target.closest(selOf());
+    if(!it)return;
+    src=it;sx=e.clientX;sy=e.clientY;active=false;
+    e.preventDefault();                                          // 防止拖动时选中文字
   });
+  document.addEventListener("pointermove",e=>{
+    if(!src)return;
+    if(!active){
+      if(Math.abs(e.clientX-sx)<5&&Math.abs(e.clientY-sy)<5)return;  // 5px 阈值，避免误触
+      active=true;src.classList.add("dragging");document.body.classList.add("drag-active");
+    }
+    e.preventDefault();
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const over=el&&el.closest(selOf());
+    if(!over||over===src)return;
+    const r=over.getBoundingClientRect();
+    container.insertBefore(src,(e.clientY-r.top)>r.height/2?over.nextSibling:over);
+  });
+  document.addEventListener("pointerup",()=>finish(true));
+  document.addEventListener("pointercancel",()=>finish(false));
 }
 function renderSum(){
   $("sumEnabled").checked=S.sumOn;$("sumConfig").style.display=S.sumOn?"block":"none";
@@ -772,8 +781,8 @@ function renderSum(){
     const u=sh&&sh.colMeta&&sh.colMeta[c]?sh.colMeta[c].unique:0;
     const on=r.kind!=="none";
     const gDefName=r.kind==="group"?c:defaultLabel(c,r.kind);
-    return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}" draggable="true">
-      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}</div>
+    return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}">
+      <div class="fk"><span class="grip" title="按住拖动可调整顺序"><svg width="9" height="13" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="7" cy="7" r="1.5"/><circle cx="3" cy="11" r="1.5"/><circle cx="7" cy="11" r="1.5"/></svg></span><input type="checkbox" class="gchk" ${on?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}</div>
       <select class="gkind" style="width:100%">
         <option value="group"${r.kind==="group"?" selected":""}>分组维度</option>
         <option value="cdistinct"${r.kind==="cdistinct"?" selected":""}>计数（去重）</option>
@@ -790,8 +799,8 @@ function renderSum(){
     const on=r.kind!=="none";
     const need=on&&r.kind!=="group";
     const opts=[["sum","求和"],["cdistinct","计数（去重）"],["crows","计数（行数）"],["none","不参与"]];
-    return `<tr data-c="${esc(c)}" draggable="true" class="${on?"masked":""}">
-      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span></div></td>
+    return `<tr data-c="${esc(c)}" class="${on?"masked":""}">
+      <td><div class="fname"><span class="grip" title="按住拖动可调整顺序"><svg width="9" height="13" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="7" cy="7" r="1.5"/><circle cx="3" cy="11" r="1.5"/><circle cx="7" cy="11" r="1.5"/></svg></span><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span></div></td>
       <td><select class="mkind" style="min-width:108px">${opts.map(([v,t])=>`<option value="${v}"${r.kind===v?" selected":""}>${t}</option>`).join("")}</select></td>
       <td>${need?`<input type="text" class="rlabel" style="width:150px;padding:7px 10px;border:1px solid #cfdcd9;border-radius:9px" value="${esc(r.label||defaultLabel(c,r.kind))}">`:'<span style="color:var(--faint)">—</span>'}</td>
     </tr>`;

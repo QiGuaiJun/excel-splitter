@@ -108,11 +108,15 @@ def test_summary_grid_falls_back_to_single_column():
 
 
 def test_sum_fields_can_be_reordered():
-    """汇总字段要能拖拽调顺序：卡片/行可拖，松手后写回顺序并传给后端。"""
+    """汇总字段要能拖拽调顺序：pointer 拖拽 + 把手，松手后写回顺序并传给后端。"""
     html = _read(INDEX_HTML)
     assert "sumOrderDim" in html and "sumOrderNum" in html
     assert "function orderList(" in html and "function enableDragSort(" in html
-    assert 'draggable="true"' in html, "汇总字段卡/指标行缺少可拖属性"
+    # 用 pointer 事件而不是 HTML5 drag：卡片大面积是 select，dragstart 会被控件吃掉
+    assert 'container.addEventListener("pointerdown"' in html
+    assert 'container.addEventListener("pointermove"' not in html  # 移动监听挂在 document 上
+    assert "document.addEventListener(\"pointermove\"" in html
+    assert 'class="grip"' in html, "字段卡/指标行缺少拖拽把手"
     # 拖拽结束后要把 DOM 顺序写回状态并重绘
     assert 'S[container.__sortKey]=items().map(el=>el.dataset.c)' in html
     assert 'enableDragSort($("sumGroupGrid"),".gcard","sumOrderDim")' in html
