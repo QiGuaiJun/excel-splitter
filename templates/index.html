@@ -92,8 +92,18 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
   color:#a9c0bc;cursor:grab;user-select:none;border-radius:4px}
 .grip:hover{color:var(--primary);background:rgba(15,157,143,.1)}
 .gcard,#sumMetricBody tr{cursor:grab}
-.gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing;pointer-events:none}
+.gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing}
+.gcard.dragging,#sumMetricBody tr.dragging{pointer-events:none}
+.gcard.drop-before{box-shadow:inset 3px 0 0 var(--primary)}
+.gcard.drop-after{box-shadow:inset -3px 0 0 var(--primary)}
+#sumMetricBody tr.drop-before{box-shadow:inset 0 3px 0 var(--primary)}
+#sumMetricBody tr.drop-after{box-shadow:inset 0 -3px 0 var(--primary)}
 .drag-active,.drag-active *{user-select:none!important}
+.suffix-ai{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12.5px;color:var(--sub);flex-wrap:wrap}
+.suffix-ai .ai-ico{color:var(--primary);font-size:13px}
+.suffix-ai .mini{height:26px;padding:0 10px;font-size:12px;border-radius:7px;border:1px solid var(--line);
+  background:#fff;color:var(--sub);cursor:pointer;font-family:inherit}
+.suffix-ai .mini:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
 .gcard{border-color:#cfe0ee}
 .gcard.on{border-color:#378add;background:#eef6fd}
 .gcard .fk{color:#0c447c}
@@ -455,7 +465,13 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
           <h3>设置拆分后的文件名</h3>
           <p class="desc">每份文件名 = 拆分列的值 + 你写的后缀。</p>
           <div style="font-size:13px;font-weight:600;margin-bottom:8px">文件名后缀（可留空）</div>
-          <input type="text" class="big-input" id="suffix" placeholder="例如：8月企微好友添加进度（0826）">
+          <input type="text" class="big-input" id="suffix" placeholder="例如：-8月企微好友添加进度（0826）">
+          <div class="suffix-ai">
+            <span class="ai-ico">✦</span>
+            <span id="suffixHint">进入本步会自动读取源文件名，联想一个可用的后缀</span>
+            <button class="mini" id="bSuffixSmart" type="button">重新联想</button>
+            <button class="mini" id="bSuffixClear" type="button">留空</button>
+          </div>
           <div class="name-preview">
             <span class="chip" id="pvChip">市场名</span><span id="pvSuffix" style="font-weight:700"></span><span style="color:var(--faint)">.xlsx</span>
             <span class="note">每个不同值各生成一份，内含「明细」「汇总」两个 Sheet</span>
@@ -511,7 +527,7 @@ const RULE_LABEL={phone:"手机号 138****5678",idcard:"身份证 前4后4",addr
 const RE_PHONE="(?<!\\d)1[3-9]\\d{9}(?!\\d)";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},split:"",suffix:"",outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
+const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},split:"",suffix:"",suffixAuto:false,outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
 
 /* 自由导航：任意步骤可点 */
 let currentModule='distribute';
@@ -538,6 +554,7 @@ function goStep(n){
   $("btnNext").style.display=n===TOTAL?"none":"inline-flex";
   if(n===2)renderFields();
   if(n===3)renderSum();
+  if(n===4)ensureSuffix();
   if(n===TOTAL)renderConfirm();
   renderNav();
 }
@@ -557,6 +574,7 @@ async function upload(){
     const r=await fetch("/api/inspect",{method:"POST",body:fd});const j=await r.json();
     if(!j.ok)throw new Error(j.msg||"读取失败");
     S.data=j;S.sheets=j.sheets[0]?[j.sheets[0].name]:[];S.srcName="来源";S.srcMap={};S.includeDetail=true;syncOutMode();initCfg();
+    if(!S.suffix||S.suffixAuto){const sv=smartSuffix(j.filename);if(sv)fillSuffix(sv,true)}
     $("dropBig").textContent="点击重新选择，或拖拽替换文件";
     $("fileInfo").innerHTML=`<div class="file-pick"><div class="fi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" fill="#dff1ef"/><path d="M14 3v4h4" stroke="#0f9d8f" stroke-width="1.6"/></svg></div><div><div class="fn">${esc(j.filename)}</div><div class="fs">${j.sheets.length} 个子表 · 读取成功</div></div><button class="linkbtn" id="repick">重新选择</button></div>`;
     $("repick").onclick=()=>fileInput.click();
@@ -614,6 +632,40 @@ function renderSheets(){
     }
   };
   document.querySelectorAll(".srcval").forEach(inp=>inp.oninput=e=>S.srcMap[e.target.dataset.sheet]=e.target.value);
+}
+/* 源文件名 → 后缀联想：去扩展名、去「副本/(1)/导出」噪音、日期统一成（MMDD） */
+function smartSuffix(name){
+  if(!name)return "";
+  let base=String(name).replace(/\.(xlsx|xlsm|xls|csv)$/i,"").trim();
+  base=base.replace(/[\s_-]*(?:副本|copy|导出|导出数据|导出结果|数据导出)\s*$/i,"").trim();
+  base=base.replace(/[\s_-]*[（(]\d{1,2}[)）]\s*$/,"").trim();          // 去掉 (1)(12)，不动（0826）
+  if(!base)return "";
+  if(/[（(]\d{4}[)）]\s*$/.test(base))return base;                      // 已是（0826），原样保留
+  let md="";
+  base=base.replace(/(20\d{2})\s*[-./年]\s*(\d{1,2})\s*[-./月]\s*(\d{1,2})\s*日?/,
+    (m,y,mo,d)=>{md=String(mo).padStart(2,"0")+String(d).padStart(2,"0");return ""}).trim();
+  const m8=base.match(/(20\d{2})(\d{2})(\d{2})/);
+  if(!md&&m8){md=m8[2]+m8[3];base=base.replace(m8[0],"")}
+  base=base.replace(/[\s\-_.]+$/,"").trim();
+  if(!base&&!md)return "";
+  return md?(base?base+"（"+md+"）":"（"+md+"）"):base;
+}
+function applySuffixHint(){
+  const hint=$("suffixHint");if(!hint)return;
+  const fn=S.data&&S.data.filename;
+  hint.textContent=S.suffix
+    ?(S.suffixAuto&&fn?`已按源文件名「${fn}」联想，可自行修改（可加 - 分隔）`:"当前后缀由你填写")
+    :"后缀为空，输出文件名只保留拆分值";
+}
+function fillSuffix(v,auto){
+  S.suffix=v;S.suffixAuto=!!auto;
+  const i=$("suffix"),p=$("pvSuffix");
+  if(i)i.value=v;if(p)p.textContent=v;
+  applySuffixHint();
+}
+function ensureSuffix(){
+  if(!S.suffix){const v=smartSuffix(S.data&&S.data.filename);if(v)fillSuffix(v,true)}
+  applySuffixHint();
 }
 function initCfg(){
   const sh=mergedView();S.cfg={};S.role={};
@@ -730,14 +782,19 @@ function enableDragSort(container,selector,key){
   container.__sortKey=key;container.__sortSel=selector;
   if(container.__sortBound)return;
   container.__sortBound=true;
-  let src=null,active=false,sx=0,sy=0;
+  let src=null,active=false,sx=0,sy=0,dest=null,destAfter=false;
   const selOf=()=>container.__sortSel;
   const items=()=>[...container.querySelectorAll(selOf())];
+  const clearDest=()=>{if(dest){dest.classList.remove("drop-before","drop-after");dest=null}};
   const finish=commit=>{
-    if(!src)return;
-    src.classList.remove("dragging");document.body.classList.remove("drag-active");
-    const moved=active;src=null;active=false;
-    if(moved&&commit){S[container.__sortKey]=items().map(el=>el.dataset.c);renderSum()}
+    const el=src;if(!el)return;
+    const d=dest,after=destAfter,moved=active;
+    el.classList.remove("dragging");document.body.classList.remove("drag-active");
+    clearDest();src=null;active=false;
+    if(!moved||!commit||!d)return;                    // 没有明确落点就不动，避免误改
+    container.insertBefore(el,after?d.nextSibling:d);
+    S[container.__sortKey]=items().map(x=>x.dataset.c);
+    renderSum();
   };
   container.addEventListener("pointerdown",e=>{
     if(e.button!==0)return;
@@ -752,16 +809,21 @@ function enableDragSort(container,selector,key){
     if(!active){
       if(Math.abs(e.clientX-sx)<5&&Math.abs(e.clientY-sy)<5)return;  // 5px 阈值，避免误触
       active=true;src.classList.add("dragging");document.body.classList.add("drag-active");
+      document.body.style.cursor="grabbing";
     }
     e.preventDefault();
     const el=document.elementFromPoint(e.clientX,e.clientY);
     const over=el&&el.closest(selOf());
-    if(!over||over===src)return;
+    if(!over||over===src||!container.contains(over)){clearDest();return}
     const r=over.getBoundingClientRect();
-    container.insertBefore(src,(e.clientY-r.top)>r.height/2?over.nextSibling:over);
+    const after=(e.clientY-r.top)>r.height/2;         // 落在目标的下半区 = 插到它后面
+    if(over!==dest||after!==destAfter){
+      clearDest();dest=over;destAfter=after;
+      over.classList.add(after?"drop-after":"drop-before");
+    }
   });
-  document.addEventListener("pointerup",()=>finish(true));
-  document.addEventListener("pointercancel",()=>finish(false));
+  document.addEventListener("pointerup",()=>{document.body.style.cursor="";finish(true)});
+  document.addEventListener("pointercancel",()=>{document.body.style.cursor="";finish(false)});
 }
 function renderSum(){
   $("sumEnabled").checked=S.sumOn;$("sumConfig").style.display=S.sumOn?"block":"none";
@@ -873,7 +935,9 @@ $("sumEnabled").onchange=e=>{S.sumOn=e.target.checked;$("sumConfig").style.displ
 $("autoSum").onclick=()=>{recommendSum();renderSum()};
 
 /* 步骤4 */
-$("suffix").oninput=e=>{S.suffix=e.target.value;$("pvSuffix").textContent=S.suffix};
+$("suffix").oninput=e=>{S.suffix=e.target.value;S.suffixAuto=false;$("pvSuffix").textContent=S.suffix;applySuffixHint()};
+$("bSuffixSmart").onclick=()=>fillSuffix(smartSuffix(S.data&&S.data.filename),true);
+$("bSuffixClear").onclick=()=>fillSuffix("",false);
 /* 步骤5 */
 $("browse").onclick=async()=>{const b=$("browse");b.textContent="请在弹窗选择…";try{const r=await fetch("/api/browse_folder",{method:"POST"});const j=await r.json();if(j.ok){$("outdir").value=j.path;S.outdir=j.path}}finally{b.textContent="浏览…"}};
 $("outdir").oninput=e=>S.outdir=e.target.value;
@@ -1015,7 +1079,7 @@ async function applyTpl(){
   S.sheets=(cfg.sheets||[]).filter(s=>S.data.sheets.some(x=>x.name===s));
   if(!S.sheets.length&&S.data.sheets.length)S.sheets=[S.data.sheets[0].name];
   S.srcName=cfg.source_col||"来源";S.srcMap=cfg.source_map||{};S.includeDetail=cfg.include_detail!==false;syncOutMode();
-  S.suffix=cfg.suffix||"";
+  S.suffix=cfg.suffix||"";S.suffixAuto=false;
   // 2) 重置字段/脱敏/拆分列/汇总
   initCfg();
   const k=(cfg.keep_columns||[]).filter(c=>cols.has(c));

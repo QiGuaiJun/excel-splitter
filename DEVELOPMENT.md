@@ -215,10 +215,13 @@ excel-splitter/
   最初试过原生 HTML5 drag，但卡片大部分面积是 select，浏览器从控件上起手会直接取消拖动，
   用户实测就是"拖不动"，所以换掉。现在：`pointerdown` 只排除 `input/select/textarea/button`
   （这些控件上按下要能正常勾选、改类型、输列名），其余区域（左侧把手、字段名、卡片空白）
-  都能起手；移动超过 5px 才进入拖拽态并加 `.dragging`，避免点一下就误判；`pointermove`
-  用 `document.elementFromPoint()` 找出鼠标落在哪张卡上，按上下半区 `insertBefore` 让其它
-  卡片当场让位；`pointerup` 把 DOM 顺序写回 `S[key]` 再 `renderSum()`，预览随即刷新；
-  `pointercancel` 只清样式不写顺序，避免误改。
+  都能起手；移动超过 5px 才进入拖拽态并加 `.dragging`，避免点一下就误判。
+- **拖动过程只给指示、松手才落位**：第一版是 `pointermove` 里直接 `insertBefore` 让卡片实时
+  让位，卡片在鼠标下方来回跳、很难对准，用户反馈"拖动不方便"。现在改为：`pointermove` 只用
+  `document.elementFromPoint()` 判断落在哪张卡的上半区 / 下半区，给那张卡加 `.drop-before` /
+  `.drop-after`（卡片是左/右边缘高亮，指标行是上/下边缘高亮）作为插入位置提示；`pointerup`
+  时才真正 `insertBefore`，再把 DOM 顺序写回 `S[key]` 并 `renderSum()`。没有明确落点时保持原样，
+  `pointercancel` 不写顺序，避免误改。
 - **监听只绑一次**：容器是常驻元素、`innerHTML` 每次重绘，所以 pointerdown 挂容器、
   pointermove / pointerup 挂 document，并用 `container.__sortBound` 去重，`key` /
   `selector` 存在容器上复用，否则每次重绘都会叠加一层监听、一次拖拽触发多轮重渲染。
@@ -235,6 +238,16 @@ excel-splitter/
 - **兼容性**：pointer 事件在桌面 Chrome/Edge 与触屏上都有效；不再保留 ↑↓ 按钮，避免两套
   排序入口并存。唯一限制是 select / 输入框上按下不会起拖（要保证控件本身可正常操作），
   所以每张卡都留了把手，从把手或字段名处起手即可。
+
+#### 文件名后缀的智能联想
+- 进入第 4 步（或换文件）时，`smartSuffix(源文件名)` 自动填一个可用后缀。规则：去扩展名 →
+  去掉 `副本 / copy / 导出…` 尾巴 → 去掉 `(1)(12)` 这类重复标记（`（0826）` 是 4 位，属于
+  有意义的日期，必须保留）→ 把 `2026-08-26` / `2026.8.26` / `20260826` 统一收成 `（0826）`
+  接在末尾 → 若文件名本身没有日期就原样使用（如 `丽水市场.xlsx` → `丽水市场`）。
+- 用 `S.suffixAuto` 区分"自动联想"和"用户手填"：手填过的值换文件时不会被动；如果当前仍是
+  自动值，换文件会按新文件名重新联想。第 4 步给了「重新联想」「留空」两个按钮，随时可推翻。
+- 输出文件名是 `拆分值 + 后缀 + .xlsx` **直接拼接**，不自动插分隔符；想要 `丽水-8月…` 就在
+  后缀里自己写 `-`，界面提示文案已写明这一点。
 
 #### 单元格底色保留的实现要点
 - **读取**：`services/excel_style.py` 直接解 OOXML（`styles.xml` 取色 + `iterparse` 流式扫

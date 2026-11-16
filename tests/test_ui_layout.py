@@ -107,6 +107,18 @@ def test_summary_grid_falls_back_to_single_column():
     ), "汇总设置缺少窄屏单列回退"
 
 
+def test_suffix_ai_suggest():
+    """文件后缀要能按源文件名自动联想，且允许重新联想 / 留空。"""
+    html = _read(INDEX_HTML)
+    assert "function smartSuffix(name)" in html
+    assert "if(n===4)ensureSuffix()" in html, "进入命名步骤时应自动联想后缀"
+    assert "S.suffixAuto" in html, "需要区分自动联想值与用户手填值"
+    assert "smartSuffix(j.filename)" in html, "上传文件后应按源文件名联想"
+    assert 'id="bSuffixSmart"' in html and 'id="bSuffixClear"' in html
+    # 日期统一成（MMDD），常见噪音（副本/(1)/导出）要去掉
+    assert "副本" in html and "20\\d{2}" in html
+
+
 def test_sum_fields_can_be_reordered():
     """汇总字段要能拖拽调顺序：pointer 拖拽 + 把手，松手后写回顺序并传给后端。"""
     html = _read(INDEX_HTML)
@@ -118,7 +130,9 @@ def test_sum_fields_can_be_reordered():
     assert "document.addEventListener(\"pointermove\"" in html
     assert 'class="grip"' in html, "字段卡/指标行缺少拖拽把手"
     # 拖拽结束后要把 DOM 顺序写回状态并重绘
-    assert 'S[container.__sortKey]=items().map(el=>el.dataset.c)' in html
+    assert 'S[container.__sortKey]=items().map(x=>x.dataset.c)' in html
+    # 拖动过程只显示插入指示线，松手才真正插入（避免整块卡片来回跳）
+    assert "drop-before" in html and "drop-after" in html
     assert 'enableDragSort($("sumGroupGrid"),".gcard","sumOrderDim")' in html
     assert 'enableDragSort($("sumMetricBody"),"tr","sumOrderNum")' in html
     # 顺序必须随 summary 一起发给后端，否则预览与导出还是老顺序
