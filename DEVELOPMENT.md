@@ -204,13 +204,20 @@ excel-splitter/
 - [x] 仅汇总不输出明细
 - [x] 明细保留源表单元格底色（.xlsx/.xlsm 实心填充；自动排序后不串行）
 - [x] 汇总表标签红色（Excel tabColor，明细标签保持默认，发给对方后一眼区分）
-- [x] 汇总字段可调前后顺序（维度卡 / 指标行都有 ↑↓，预览与导出列顺序跟随）
+- [x] 汇总字段可拖拽调顺序（按住维度卡 / 指标行拖到目标位置，预览与导出列顺序跟随）
 - [x] 表头冻结（导出 Excel 明细与汇总首行 freeze_panes="A2"；网页预览表头 sticky 吸顶）
 
 #### 汇总字段排序 + 表头冻结的实现要点
 - **顺序落在哪**：前端用 `S.sumOrderDim`（文本维度）与 `S.sumOrderNum`（数值指标）两个数组
   保存用户手调的顺序；`orderList()` 每次渲染把顺序对齐到当前字段集合（新字段追加末尾、
   已删除的剔除），所以换文件 / 改保留字段都不会把顺序带乱。
+- **拖拽而不是按钮**：`enableDragSort(container, selector, key)` 用原生 HTML5 drag：
+  `dragstart` 记下拖动元素（起点在 input/select/button 上时 `preventDefault`，避免和
+  勾选、改类型、输列名打架）；`dragover` 按鼠标落在目标的上/下半区实时 `insertBefore`
+  让其它卡片当场让位；`dragend` 把 DOM 顺序写回 `S[key]` 再 `renderSum()`，预览随即刷新。
+- **监听只绑一次**：容器是常驻元素、`innerHTML` 每次重绘，所以 drag 监听挂容器上并用
+  `container.__sortBound` 去重，`key` / `selector` 存在容器上供复用，否则每次重绘都会
+  叠加一层监听、一次拖拽触发多轮重渲染。
 - **顺序必须传后端**：`sumConf()` 除 groups/sums/counts 外额外产出 `order`（最终列名数组），
   `build_summary()` 末尾 `_apply_order()` 按它重排 DataFrame。只改前端渲染顺序而不传
   `order`，预览会变、导出文件却还是老的——这是最容易漏的一步。
@@ -219,6 +226,8 @@ excel-splitter/
 - **冻结范围**：`_autofit_ws()` 统一设 `ws.freeze_panes = "A2"`，明细与汇总都生效。
   预览表头用 `#pvThead th{position:sticky;top:0}`；表格是 `border-collapse:collapse`，
   sticky 后 border-bottom 会消失，所以用 `box-shadow:inset 0 -1px 0` 补分隔线。
+- **兼容性**：HTML5 drag 在桌面端（Chrome/Edge）可用，触屏设备不触发——目前只考虑本地
+  桌面工作台，因此不再保留 ↑↓ 按钮，避免两套排序入口并存。
 
 #### 单元格底色保留的实现要点
 - **读取**：`services/excel_style.py` 直接解 OOXML（`styles.xml` 取色 + `iterparse` 流式扫

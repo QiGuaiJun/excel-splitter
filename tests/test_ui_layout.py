@@ -108,13 +108,19 @@ def test_summary_grid_falls_back_to_single_column():
 
 
 def test_sum_fields_can_be_reordered():
-    """汇总字段要能调前后顺序：卡片/指标行有 ↑↓ 按钮，顺序值送进 sumConf。"""
+    """汇总字段要能拖拽调顺序：卡片/行可拖，松手后写回顺序并传给后端。"""
     html = _read(INDEX_HTML)
     assert "sumOrderDim" in html and "sumOrderNum" in html
-    assert "function orderList(" in html and "function moveField(" in html
-    assert 'class="ord"' in html, "汇总字段卡缺少前移/后移按钮"
+    assert "function orderList(" in html and "function enableDragSort(" in html
+    assert 'draggable="true"' in html, "汇总字段卡/指标行缺少可拖属性"
+    # 拖拽结束后要把 DOM 顺序写回状态并重绘
+    assert 'S[container.__sortKey]=items().map(el=>el.dataset.c)' in html
+    assert 'enableDragSort($("sumGroupGrid"),".gcard","sumOrderDim")' in html
+    assert 'enableDragSort($("sumMetricBody"),"tr","sumOrderNum")' in html
     # 顺序必须随 summary 一起发给后端，否则预览与导出还是老顺序
     assert "order,sort_label:S.sortLabel" in html
+    # ↑↓ 按钮已按用户反馈移除，避免两套排序入口并存
+    assert 'class="ord"' not in html
 
 
 def test_preview_header_is_sticky():

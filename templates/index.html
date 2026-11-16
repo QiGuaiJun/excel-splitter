@@ -87,10 +87,11 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .fcard .fk input{width:16px;height:16px;accent-color:var(--primary);flex:none}
 .fcard .fmeta{display:flex;gap:6px;flex-wrap:wrap}
 .fcard .fk .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ord-btns{display:inline-flex;gap:2px;flex:none;margin-left:4px}
-.ord-btns button{width:20px;height:20px;padding:0;border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--sub);font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.ord-btns button:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
-.ord-btns button:disabled{opacity:.3;cursor:default}
+/* 汇总字段拖拽排序：按住卡片 / 行拖动就能换位置 */
+.gcard[draggable="true"],#sumMetricBody tr[draggable="true"]{cursor:grab}
+.gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing}
+.gcard.dragging,#sumMetricBody tr.dragging{pointer-events:none}
+.drag-active,.drag-active *{user-select:none!important}
 .gcard{border-color:#cfe0ee}
 .gcard.on{border-color:#378add;background:#eef6fd}
 .gcard .fk{color:#0c447c}
@@ -412,12 +413,12 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
             <div class="sum-grid">
               <div>
                 <div class="sub-block">
-                  <div class="lab"><span class="lab-t">文本维度</span> <span class="step-hint">勾选或选「分组维度」= 按此列分组；编号类列可计数</span></div>
+                  <div class="lab"><span class="lab-t">文本维度</span> <span class="step-hint">勾选或选「分组维度」= 按此列分组；编号类列可计数 · 按住卡片拖动可调顺序</span></div>
                   <div class="dim-hint" id="dimHint"></div>
                   <div class="field-grid" id="sumGroupGrid"></div>
                 </div>
                 <div class="sub-block">
-                  <div class="lab"><span class="lab-t">数值指标</span> <span class="step-hint">勾选=参与汇总；类型可选求和 / 计数；手机号等编号列已自动排除</span></div>
+                  <div class="lab"><span class="lab-t">数值指标</span> <span class="step-hint">勾选=参与汇总；类型可选求和 / 计数；手机号等编号列已自动排除 · 按住行拖动可调顺序</span></div>
                   <div class="table-wrap" style="margin-top:4px"><table>
                     <thead><tr><th>字段</th><th style="width:118px">类型</th><th>输出列名（可改）</th></tr></thead>
                     <tbody id="sumMetricBody"></tbody>
@@ -713,7 +714,6 @@ function recommendSum(){
   const sl=kept().find(c=>S.role[c]&&S.role[c].kind==="sum");
   if(sl){S.sortLabel=S.role[sl].label||defaultLabel(sl,"sum");S.sortDesc=true}
 }
-function renderSum(){
 // 汇总字段顺序：把已保存的顺序对齐到当前字段集合（新增进末尾、已删除的剔除）
 function orderList(cols,key){
   const cur=new Set(cols);
@@ -721,11 +721,40 @@ function orderList(cols,key){
   cols.forEach(c=>{if(!arr.includes(c))arr.push(c)});
   S[key]=arr;return arr;
 }
-function moveField(key,col,dir){
-  const arr=S[key]||[],i=arr.indexOf(col),j=i+dir;
-  if(i<0||j<0||j>=arr.length)return;
-  arr.splice(i,1);arr.splice(j,0,col);renderSum();
+// 汇总字段拖拽排序：按住卡片 / 行拖到目标位置，松手后写回顺序并重绘（预览跟着变）
+// 容器常驻、innerHTML 每次重绘，所以监听只绑一次，key / selector 存在容器上复用
+function enableDragSort(container,selector,key){
+  container.__sortKey=key;container.__sortSel=selector;
+  if(container.__sortBound)return;
+  container.__sortBound=true;
+  let src=null;
+  const selOf=()=>container.__sortSel;
+  const items=()=>[...container.querySelectorAll(selOf())];
+  container.addEventListener("dragstart",e=>{
+    const it=e.target.closest(selOf());
+    if(!it||e.target.closest("input,select,textarea,button")){e.preventDefault();return}
+    src=it;it.classList.add("dragging");document.body.classList.add("drag-active");
+    e.dataTransfer.effectAllowed="move";
+    try{e.dataTransfer.setData("text/plain",it.dataset.c)}catch(_){}
+  });
+  container.addEventListener("dragover",e=>{
+    if(!src)return;
+    e.preventDefault();e.dataTransfer.dropEffect="move";
+    const over=e.target.closest(selOf());
+    if(!over||over===src)return;
+    const r=over.getBoundingClientRect();
+    const after=(e.clientY-r.top)>r.height/2;   // 落在目标的下半区 = 插到它后面
+    container.insertBefore(src,after?over.nextSibling:over);
+  });
+  container.addEventListener("drop",e=>{if(src)e.preventDefault()});
+  container.addEventListener("dragend",()=>{
+    if(!src)return;
+    src.classList.remove("dragging");document.body.classList.remove("drag-active");
+    S[container.__sortKey]=items().map(el=>el.dataset.c);
+    src=null;renderSum();
+  });
 }
+function renderSum(){
   $("sumEnabled").checked=S.sumOn;$("sumConfig").style.display=S.sumOn?"block":"none";
   const sh=mergedView();
   if(!S.sumInited){if(kept().length){recommendSum();S.sumInited=true}}
@@ -735,16 +764,16 @@ function moveField(key,col,dir){
   });
   const isSrc=c=>S.sheets.length>1&&c===(S.srcName||"来源");
   $("dimHint").innerHTML=S.split?`拆分列 <b>${esc(S.split)}</b> 按值各拆一份，不参与分组`:"<b>提示：</b>请先在第 2 步选择拆分列，此处才能预览";
-  // 文本维度区（顺序由 S.sumOrderDim 决定，卡片上 ↑↓ 可调）
+  // 文本维度区（顺序由 S.sumOrderDim 决定，按住卡片拖动即可调整）
   const textCols=kept().filter(c=>!isMeasure(c)&&c!==S.split&&!isSrc(c));
   const textOrder=orderList(textCols,"sumOrderDim");
-  $("sumGroupGrid").innerHTML=textOrder.length?textOrder.map((c,i)=>{
+  $("sumGroupGrid").innerHTML=textOrder.length?textOrder.map(c=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const u=sh&&sh.colMeta&&sh.colMeta[c]?sh.colMeta[c].unique:0;
     const on=r.kind!=="none";
     const gDefName=r.kind==="group"?c:defaultLabel(c,r.kind);
-    return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}">
-      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}<span class="ord-btns"><button type="button" class="ord" data-dir="-1" title="前移" ${i===0?"disabled":""}>↑</button><button type="button" class="ord" data-dir="1" title="后移" ${i===textOrder.length-1?"disabled":""}>↓</button></span></div>
+    return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}" draggable="true">
+      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}</div>
       <select class="gkind" style="width:100%">
         <option value="group"${r.kind==="group"?" selected":""}>分组维度</option>
         <option value="cdistinct"${r.kind==="cdistinct"?" selected":""}>计数（去重）</option>
@@ -753,16 +782,16 @@ function moveField(key,col,dir){
       </select>
       ${r.kind!=="none"?`<input type="text" class="glabel" placeholder="输出列名（可改）" value="${esc(r.label||gDefName)}" style="width:100%;margin-top:6px;padding:6px 9px;border:1px solid #cfdcd9;border-radius:8px;font-size:12.5px">`:""}</div>`;
   }).join(""):'<span style="color:var(--faint);font-size:12.5px">无可分组的文本字段</span>';
-  // 数值指标区（顺序由 S.sumOrderNum 决定）
+  // 数值指标区（顺序由 S.sumOrderNum 决定，按住行拖动即可调整）
   const numCols=kept().filter(c=>isMeasure(c));
   const numOrder=orderList(numCols,"sumOrderNum");
-  $("sumMetricBody").innerHTML=numOrder.length?numOrder.map((c,i)=>{
+  $("sumMetricBody").innerHTML=numOrder.length?numOrder.map(c=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const on=r.kind!=="none";
     const need=on&&r.kind!=="group";
     const opts=[["sum","求和"],["cdistinct","计数（去重）"],["crows","计数（行数）"],["none","不参与"]];
-    return `<tr data-c="${esc(c)}" class="${on?"masked":""}">
-      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span><span class="ord-btns"><button type="button" class="ord" data-dir="-1" title="前移" ${i===0?"disabled":""}>↑</button><button type="button" class="ord" data-dir="1" title="后移" ${i===numOrder.length-1?"disabled":""}>↓</button></span></div></td>
+    return `<tr data-c="${esc(c)}" draggable="true" class="${on?"masked":""}">
+      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span></div></td>
       <td><select class="mkind" style="min-width:108px">${opts.map(([v,t])=>`<option value="${v}"${r.kind===v?" selected":""}>${t}</option>`).join("")}</select></td>
       <td>${need?`<input type="text" class="rlabel" style="width:150px;padding:7px 10px;border:1px solid #cfdcd9;border-radius:9px" value="${esc(r.label||defaultLabel(c,r.kind))}">`:'<span style="color:var(--faint)">—</span>'}</td>
     </tr>`;
@@ -774,16 +803,15 @@ function moveField(key,col,dir){
     card.querySelector(".gkind").onchange=e=>{r.kind=e.target.value;renderSum()};
     const gl=card.querySelector(".glabel");
     if(gl)gl.oninput=e=>{const v=e.target.value;r.label=(r.kind==="group"&&v===c)?"":v;rebuildSort();refreshPreview()};
-    card.querySelectorAll(".ord").forEach(btn=>btn.onclick=e=>{e.stopPropagation();moveField("sumOrderDim",c,Number(btn.dataset.dir))});
   });
   document.querySelectorAll("#sumMetricBody tr").forEach(row=>{
     const c=row.dataset.c,r=S.role[c];if(!r)return;
     row.querySelector(".mchk").onchange=e=>{r.kind=e.target.checked?(r.kind==="none"?"sum":r.kind):"none";renderSum()};
     row.querySelector(".mkind").onchange=e=>{r.kind=e.target.value;renderSum()};
     const lab=row.querySelector(".rlabel");if(lab)lab.oninput=e=>{r.label=e.target.value;rebuildSort();refreshPreview()};
-    const rb=row.querySelector(".ord-btns");
-    if(rb)rb.querySelectorAll(".ord").forEach(btn=>btn.onclick=e=>{e.stopPropagation();moveField("sumOrderNum",c,Number(btn.dataset.dir))});
   });
+  enableDragSort($("sumGroupGrid"),".gcard","sumOrderDim");
+  enableDragSort($("sumMetricBody"),"tr","sumOrderNum");
   rebuildSort();
   refreshPreview();
 }
