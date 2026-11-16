@@ -313,11 +313,13 @@ def _prepare_df(path, file_id, ext, merge_sheets, source_col=None, source_map=No
 
 
 def _autofit_ws(ws, bold_last=False):
-    """列宽按内容自适应（中文按双宽度）、表头加粗、行高自动；可选末行加粗。"""
+    """列宽按内容自适应（中文按双宽度）、表头加粗并冻结首行、行高自动；可选末行加粗。"""
     from openpyxl.styles import Font
 
     for cell in ws[1]:
         cell.font = Font(bold=True)
+    # 表头冻结：纵向滚动时列名始终留在视野里（明细、汇总都适用）
+    ws.freeze_panes = "A2"
     if bold_last and ws.max_row >= 2:
         for cell in ws[ws.max_row]:
             cell.font = Font(bold=True)

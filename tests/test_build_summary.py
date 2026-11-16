@@ -151,3 +151,49 @@ class TestBuildSummary:
         first_sum = float(body.iloc[0]["金额合计"])
         last_sum = float(body.iloc[-1]["金额合计"])
         assert first_sum >= last_sum
+
+    # ------------------------------------------------------------------
+    # order：前端「字段顺序可调」落到最终列排列
+    # ------------------------------------------------------------------
+    def test_order_moves_metric_before_group(self, sample_df):
+        """order 允许指标列排到分组列前面。"""
+        sconf = {
+            "groups": [{"col": "健康顾问"}],
+            "sums":   [{"col": "金额", "label": "金额合计"}],
+            "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
+            "order":  ["金额合计", "健康顾问", "订单数"],
+        }
+        res = build_summary(sample_df, sconf)
+        assert list(res.columns) == ["金额合计", "健康顾问", "订单数"]
+
+    def test_order_swaps_group_columns(self, sample_df):
+        """两个分组维度的先后顺序按 order 走，合计仍填在第一个分组列。"""
+        df = sample_df.assign(区域="浙南")
+        sconf = {
+            "groups": [{"col": "健康顾问"}, {"col": "区域"}],
+            "sums":   [{"col": "金额", "label": "金额合计"}],
+            "order":  ["区域", "健康顾问", "金额合计"],
+        }
+        res = build_summary(df, sconf)
+        assert list(res.columns) == ["区域", "健康顾问", "金额合计"]
+        assert res.iloc[-1]["区域"] == "合计"
+
+    def test_order_without_groups(self, sample_df):
+        sconf = {
+            "groups": [],
+            "sums":   [{"col": "金额", "label": "金额合计"}],
+            "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
+            "order":  ["金额合计", "订单数"],
+        }
+        res = build_summary(sample_df, sconf)
+        assert list(res.columns) == ["金额合计", "订单数"]
+
+    def test_order_ignores_unknown_column(self, sample_df):
+        """order 里写错的列名忽略，其余列按原来的相对顺序跟在后面。"""
+        sconf = {
+            "groups": [{"col": "健康顾问"}],
+            "sums":   [{"col": "金额", "label": "金额合计"}],
+            "order":  ["不存在的列", "金额合计"],
+        }
+        res = build_summary(sample_df, sconf)
+        assert list(res.columns) == ["金额合计", "健康顾问"]

@@ -21,6 +21,16 @@ def _to_num(s: pd.Series) -> pd.Series:
     return pd.to_numeric(cleaned, errors="coerce")
 
 
+def _apply_order(res: pd.DataFrame, order) -> pd.DataFrame:
+    """按前端给定的列顺序重排；未出现在 order 里的列按原顺序跟在后面。"""
+    cols = [str(o) for o in (order or [])]
+    picked = [c for c in dict.fromkeys(cols) if c in res.columns]
+    if not picked:
+        return res
+    rest = [c for c in res.columns if c not in picked]
+    return res[picked + rest]
+
+
 def build_summary(sub: pd.DataFrame, scfg: dict):
     """聚合：计数(行数/去重)+求和，末行合计；支持分组列别名；无分组时整表一行总计。
 
@@ -29,6 +39,7 @@ def build_summary(sub: pd.DataFrame, scfg: dict):
       "groups":  [{"col": "健康顾问", "label": "顾问姓名"}],
       "sums":    [{"col": "金额", "label": "金额合计"}],
       "counts":  [{"col": "订单号", "label": "订单数", "distinct": true}],
+      "order":   ["顾问姓名", "金额合计", "订单数"],   # 可选，最终列顺序
       "sort_label": "金额合计",
       "sort_desc":  true,
     }
@@ -74,7 +85,7 @@ def build_summary(sub: pd.DataFrame, scfg: dict):
 
     if not gcols:
         # 无分组维度：整张表只输出一行总计
-        return pd.DataFrame([_whole_row(work)])[metric_cols]
+        return _apply_order(pd.DataFrame([_whole_row(work)])[metric_cols], scfg.get("order"))
 
     res = work.groupby(gcols, dropna=False, sort=False).agg(**agg).reset_index()
     for kind, lab in label_order:
@@ -98,8 +109,13 @@ def build_summary(sub: pd.DataFrame, scfg: dict):
         ).reset_index(drop=True)
 
     total = _whole_row(work)
-    for _gi, g in enumerate(gcols):
-        total[g] = "合计" if _gi == 0 else ""
+    disp_g = [galias[g] for g in gcols]
+    order = [str(o) for o in (scfg.get("order") or [])]
+    # 「合计」始终落在重排后最左边的分组列（用户把某个维度拖到前面时也跟着走）
+    first_disp = next((o for o in order if o in disp_g), disp_g[0])
+    for g in gcols:
+        total[g] = ""
+    total[alias2col.get(first_disp, first_disp)] = "合计"
     res = pd.concat([res, pd.DataFrame([total])], ignore_index=True)
     res = res[gcols + metric_cols].rename(columns=galias)
-    return res
+    return _apply_order(res, scfg.get("order"))

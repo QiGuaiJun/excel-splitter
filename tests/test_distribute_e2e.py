@@ -399,19 +399,22 @@ class TestSummaryShaping:
         ]
         return _post_excel(client, pd.DataFrame(rows, columns=cols), sheet_name="S")
 
-    def _run(self, client, out_dir, tag, include_detail, groups):
+    def _run(self, client, out_dir, tag, include_detail, groups, order=None):
         file_id = self._four_rows_file_id(client)
+        summary = {
+            "enabled": True, "groups": groups,
+            "sums": [{"col": "金额", "label": "金额合计"}],
+            "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
+            "sort_label": "金额合计", "sort_desc": True,
+        }
+        if order:
+            summary["order"] = order
         body = {
             "file_id": file_id, "sheet": "S",
             "keep_columns": ["归属市场", "健康顾问", "订单号", "金额"],
             "mask": {}, "split_column": "归属市场", "suffix": "",
             "output_dir": out_dir, "include_detail": include_detail,
-            "summary": {
-                "enabled": True, "groups": groups,
-                "sums": [{"col": "金额", "label": "金额合计"}],
-                "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
-                "sort_label": "金额合计", "sort_desc": True,
-            },
+            "summary": summary,
         }
         r = client.post("/api/split", json=body).get_json()
         assert r["ok"], r
@@ -471,6 +474,30 @@ class TestSummaryShaping:
         assert rc[0] == ("订单数", "金额合计")
         assert rc[1] == (3, 380)
         assert len(rc) == 2
+
+    def test_summary_columns_follow_order(self, client, out_dir):
+        """order 能把指标列提到分组列前面（字段顺序可调）。"""
+        from openpyxl import load_workbook
+        f = self._run(client, out_dir, "colorder", True, [{"col": "健康顾问"}],
+                      order=["金额合计", "订单数", "健康顾问"])
+        sm = load_workbook(f)["汇总"]
+        assert [c.value for c in sm[1]] == ["金额合计", "订单数", "健康顾问"]
+
+    def test_header_frozen_in_detail_and_summary(self, client, out_dir):
+        """明细与汇总的首行都要冻结，滚动时表头不跑掉。"""
+        from openpyxl import load_workbook
+        f = self._run(client, out_dir, "freeze", True, [{"col": "健康顾问"}])
+        wb = load_workbook(f)
+        assert wb["明细"].freeze_panes == "A2"
+        assert wb["汇总"].freeze_panes == "A2"
+
+    def test_header_frozen_when_summary_only(self, client, out_dir):
+        """只输出汇总时，那张表同样冻结首行。"""
+        from openpyxl import load_workbook
+        f = self._run(client, out_dir, "freezeonly", False, [{"col": "健康顾问"}])
+        wb = load_workbook(f)
+        assert wb.sheetnames == ["汇总"]
+        assert wb["汇总"].freeze_panes == "A2"
 
 
 # ----------------------------------------------------------------------------

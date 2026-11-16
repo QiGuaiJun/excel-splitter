@@ -86,6 +86,11 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .fcard .fk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
 .fcard .fk input{width:16px;height:16px;accent-color:var(--primary);flex:none}
 .fcard .fmeta{display:flex;gap:6px;flex-wrap:wrap}
+.fcard .fk .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ord-btns{display:inline-flex;gap:2px;flex:none;margin-left:4px}
+.ord-btns button{width:20px;height:20px;padding:0;border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--sub);font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ord-btns button:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+.ord-btns button:disabled{opacity:.3;cursor:default}
 .gcard{border-color:#cfe0ee}
 .gcard.on{border-color:#378add;background:#eef6fd}
 .gcard .fk{color:#0c447c}
@@ -111,6 +116,8 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .table-wrap{border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead th{background:#f6f9f8;text-align:left;font-size:12px;color:var(--sub);font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+/* 预览表头吸顶：表格纵向滚动时列名始终可见（border-collapse 下用内阴影补分隔线） */
+#pvThead th{position:sticky;top:0;z-index:2;background:#f6f9f8;box-shadow:inset 0 -1px 0 var(--line)}
 tbody td{padding:10px 14px;border-bottom:1px solid #f0f4f3;font-size:13.5px}
 tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbody tr.masked{background:#f3faf9}
 .fname{font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -707,6 +714,18 @@ function recommendSum(){
   if(sl){S.sortLabel=S.role[sl].label||defaultLabel(sl,"sum");S.sortDesc=true}
 }
 function renderSum(){
+// 汇总字段顺序：把已保存的顺序对齐到当前字段集合（新增进末尾、已删除的剔除）
+function orderList(cols,key){
+  const cur=new Set(cols);
+  let arr=(S[key]||[]).filter(c=>cur.has(c));
+  cols.forEach(c=>{if(!arr.includes(c))arr.push(c)});
+  S[key]=arr;return arr;
+}
+function moveField(key,col,dir){
+  const arr=S[key]||[],i=arr.indexOf(col),j=i+dir;
+  if(i<0||j<0||j>=arr.length)return;
+  arr.splice(i,1);arr.splice(j,0,col);renderSum();
+}
   $("sumEnabled").checked=S.sumOn;$("sumConfig").style.display=S.sumOn?"block":"none";
   const sh=mergedView();
   if(!S.sumInited){if(kept().length){recommendSum();S.sumInited=true}}
@@ -716,15 +735,16 @@ function renderSum(){
   });
   const isSrc=c=>S.sheets.length>1&&c===(S.srcName||"来源");
   $("dimHint").innerHTML=S.split?`拆分列 <b>${esc(S.split)}</b> 按值各拆一份，不参与分组`:"<b>提示：</b>请先在第 2 步选择拆分列，此处才能预览";
-  // 文本维度区
+  // 文本维度区（顺序由 S.sumOrderDim 决定，卡片上 ↑↓ 可调）
   const textCols=kept().filter(c=>!isMeasure(c)&&c!==S.split&&!isSrc(c));
-  $("sumGroupGrid").innerHTML=textCols.length?textCols.map(c=>{
+  const textOrder=orderList(textCols,"sumOrderDim");
+  $("sumGroupGrid").innerHTML=textOrder.length?textOrder.map((c,i)=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const u=sh&&sh.colMeta&&sh.colMeta[c]?sh.colMeta[c].unique:0;
     const on=r.kind!=="none";
     const gDefName=r.kind==="group"?c:defaultLabel(c,r.kind);
     return `<div class="fcard gcard ${on?"on":""}" data-c="${esc(c)}">
-      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}</div>
+      <div class="fk"><input type="checkbox" class="gchk" ${on?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span>${u?`<span class="mini-tag" style="background:#eef6fd;color:#185fa5">${u} 种</span>`:""}<span class="ord-btns"><button type="button" class="ord" data-dir="-1" title="前移" ${i===0?"disabled":""}>↑</button><button type="button" class="ord" data-dir="1" title="后移" ${i===textOrder.length-1?"disabled":""}>↓</button></span></div>
       <select class="gkind" style="width:100%">
         <option value="group"${r.kind==="group"?" selected":""}>分组维度</option>
         <option value="cdistinct"${r.kind==="cdistinct"?" selected":""}>计数（去重）</option>
@@ -733,15 +753,16 @@ function renderSum(){
       </select>
       ${r.kind!=="none"?`<input type="text" class="glabel" placeholder="输出列名（可改）" value="${esc(r.label||gDefName)}" style="width:100%;margin-top:6px;padding:6px 9px;border:1px solid #cfdcd9;border-radius:8px;font-size:12.5px">`:""}</div>`;
   }).join(""):'<span style="color:var(--faint);font-size:12.5px">无可分组的文本字段</span>';
-  // 数值指标区
+  // 数值指标区（顺序由 S.sumOrderNum 决定）
   const numCols=kept().filter(c=>isMeasure(c));
-  $("sumMetricBody").innerHTML=numCols.length?numCols.map(c=>{
+  const numOrder=orderList(numCols,"sumOrderNum");
+  $("sumMetricBody").innerHTML=numOrder.length?numOrder.map((c,i)=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const on=r.kind!=="none";
     const need=on&&r.kind!=="group";
     const opts=[["sum","求和"],["cdistinct","计数（去重）"],["crows","计数（行数）"],["none","不参与"]];
     return `<tr data-c="${esc(c)}" class="${on?"masked":""}">
-      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span></div></td>
+      <td><div class="fname"><input type="checkbox" class="mchk" ${on?"checked":""} style="width:15px;height:15px;accent-color:var(--primary)"> ${esc(c)}<span class="col-tag num-tag">数值</span><span class="ord-btns"><button type="button" class="ord" data-dir="-1" title="前移" ${i===0?"disabled":""}>↑</button><button type="button" class="ord" data-dir="1" title="后移" ${i===numOrder.length-1?"disabled":""}>↓</button></span></div></td>
       <td><select class="mkind" style="min-width:108px">${opts.map(([v,t])=>`<option value="${v}"${r.kind===v?" selected":""}>${t}</option>`).join("")}</select></td>
       <td>${need?`<input type="text" class="rlabel" style="width:150px;padding:7px 10px;border:1px solid #cfdcd9;border-radius:9px" value="${esc(r.label||defaultLabel(c,r.kind))}">`:'<span style="color:var(--faint)">—</span>'}</td>
     </tr>`;
@@ -753,12 +774,15 @@ function renderSum(){
     card.querySelector(".gkind").onchange=e=>{r.kind=e.target.value;renderSum()};
     const gl=card.querySelector(".glabel");
     if(gl)gl.oninput=e=>{const v=e.target.value;r.label=(r.kind==="group"&&v===c)?"":v;rebuildSort();refreshPreview()};
+    card.querySelectorAll(".ord").forEach(btn=>btn.onclick=e=>{e.stopPropagation();moveField("sumOrderDim",c,Number(btn.dataset.dir))});
   });
   document.querySelectorAll("#sumMetricBody tr").forEach(row=>{
     const c=row.dataset.c,r=S.role[c];if(!r)return;
     row.querySelector(".mchk").onchange=e=>{r.kind=e.target.checked?(r.kind==="none"?"sum":r.kind):"none";renderSum()};
     row.querySelector(".mkind").onchange=e=>{r.kind=e.target.value;renderSum()};
     const lab=row.querySelector(".rlabel");if(lab)lab.oninput=e=>{r.label=e.target.value;rebuildSort();refreshPreview()};
+    const rb=row.querySelector(".ord-btns");
+    if(rb)rb.querySelectorAll(".ord").forEach(btn=>btn.onclick=e=>{e.stopPropagation();moveField("sumOrderNum",c,Number(btn.dataset.dir))});
   });
   rebuildSort();
   refreshPreview();
@@ -845,12 +869,14 @@ function ruleText(c){
 }
 function sumConf(){
   if(!S.sumOn)return{enabled:false};
-  const groups=[],sums=[],counts=[];
-  kept().forEach(c=>{const r=S.role[c];if(!r)return;
-    if(r.kind==="group")groups.push({col:c,label:(r.label||"").trim()});
-    else if(r.kind==="sum")sums.push({col:c,label:(r.label||defaultLabel(c,"sum")).trim()});
-    else if(r.kind==="cdistinct"||r.kind==="crows")counts.push({col:c,label:(r.label||defaultLabel(c,r.kind)).trim(),distinct:r.kind==="cdistinct"});});
-  return{enabled:true,groups,sums,counts,sort_label:S.sortLabel,sort_desc:S.sortDesc};
+  const groups=[],sums=[],counts=[],order=[];
+  const seq=[...(S.sumOrderDim||[]),...(S.sumOrderNum||[])];
+  const rest=kept().filter(c=>!seq.includes(c));
+  [...seq,...rest].forEach(c=>{const r=S.role[c];if(!r)return;
+    if(r.kind==="group"){const lab=(r.label||"").trim()||c;groups.push({col:c,label:(r.label||"").trim()});order.push(lab)}
+    else if(r.kind==="sum"){const lab=(r.label||defaultLabel(c,"sum")).trim()||defaultLabel(c,"sum");sums.push({col:c,label:lab});order.push(lab)}
+    else if(r.kind==="cdistinct"||r.kind==="crows"){const lab=(r.label||defaultLabel(c,r.kind)).trim()||defaultLabel(c,r.kind);counts.push({col:c,label:lab,distinct:r.kind==="cdistinct"});order.push(lab)}});
+  return{enabled:true,groups,sums,counts,order,sort_label:S.sortLabel,sort_desc:S.sortDesc};
 }
 function renderConfirm(){
   const k=kept(),m=masked(),sc=sumConf();

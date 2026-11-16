@@ -107,6 +107,31 @@ def test_summary_grid_falls_back_to_single_column():
     ), "汇总设置缺少窄屏单列回退"
 
 
+def test_sum_fields_can_be_reordered():
+    """汇总字段要能调前后顺序：卡片/指标行有 ↑↓ 按钮，顺序值送进 sumConf。"""
+    html = _read(INDEX_HTML)
+    assert "sumOrderDim" in html and "sumOrderNum" in html
+    assert "function orderList(" in html and "function moveField(" in html
+    assert 'class="ord"' in html, "汇总字段卡缺少前移/后移按钮"
+    # 顺序必须随 summary 一起发给后端，否则预览与导出还是老顺序
+    assert "order,sort_label:S.sortLabel" in html
+
+
+def test_preview_header_is_sticky():
+    """预览表头吸顶：纵向滚动时列名要一直可见（border-collapse 用内阴影补分隔线）。"""
+    html = _read(INDEX_HTML)
+    block = html.split("#pvThead th{", 1)[1].split("}", 1)[0]
+    assert "position:sticky" in block
+    assert "top:0" in block.replace(" ", "")
+    assert "z-index:2" in block.replace(" ", "")
+
+
+def test_excel_header_is_frozen():
+    """导出的明细/汇总都要冻结首行，否则长表滚动后看不清列名。"""
+    src = (BASE_DIR / "api" / "distribute.py").read_text(encoding="utf-8")
+    assert 'ws.freeze_panes = "A2"' in src
+
+
 # ---------------------------------------------------------------- 配置模板栏
 
 
