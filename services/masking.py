@@ -9,6 +9,8 @@ URL：
 - idcard     身份证：前 4 后 4（如 3307**********1234）
 - address    地址：保留到区/县级市
 - name       姓名：保留姓，其余 *
+- bankcard   银行卡：保留后 4 位（************1234）
+- email      邮箱：保留前 2 位（ab***@qq.com）
 - keep_ab    自定义前后各 a/b 位
 - replace    整列统一替换
 - regex      按正则找出文内片段再部分打星（如"张三13812345678"只动号码，姓名保留）
@@ -93,6 +95,40 @@ def mask_address(v):
     return head + "****"
 
 
+def mask_bankcard(v):
+    """银行卡号：保留后 4 位，其余用 *（16 位 => ************1234）
+
+    只处理数字部分；空格、连字符等分隔符会被丢掉，保证打码后的位数可核对。
+    位数不足 4 位时全部打星，不暴露任何数字。
+    """
+    if v is None:
+        return v
+    s = str(v).strip()
+    if s == "" or s.lower() == "nan":
+        return ""
+    d = _digits(s)
+    if len(d) <= 4:
+        return "*" * len(d)
+    return "*" * (len(d) - 4) + d[-4:]
+
+
+def mask_email(v):
+    """邮箱：保留前 2 位，中间固定 ***，域名原样（ab***@qq.com）
+
+    不含 @ 的文本不当邮箱处理，原样返回（避免把普通说明文字整段替换）。
+    """
+    if v is None:
+        return v
+    s = str(v).strip()
+    if s == "" or s.lower() == "nan":
+        return ""
+    if "@" not in s:
+        return s
+    local, at, domain = s.partition("@")
+    keep = local[:2]
+    return keep + "***" + at + domain
+
+
 def mask_keep_ab(v, a=0, b=0):
     """通用：保留前 a 位、后 b 位，其余用 *"""
     if v is None:
@@ -158,10 +194,12 @@ def mask_regex(v, pattern=None, a=3, b=4):
 
 # 规则注册表（type -> ("显示名称", 函数)）
 RULES = {
-    "phone":   ("手机号(前3后4)", mask_phone),
-    "idcard":  ("身份证(前4后4)", mask_idcard),
-    "address": ("详细地址(保留到区县)", mask_address),
-    "name":    ("姓名(留姓)", mask_name),
+    "phone":    ("手机号(前3后4)", mask_phone),
+    "idcard":   ("身份证(前4后4)", mask_idcard),
+    "address":  ("详细地址(保留到区县)", mask_address),
+    "name":     ("姓名(留姓)", mask_name),
+    "bankcard": ("银行卡号(保留后4位)", mask_bankcard),
+    "email":    ("邮箱(保留前2位)", mask_email),
 }
 
 

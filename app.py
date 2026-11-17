@@ -24,6 +24,7 @@ from flask import Flask, render_template
 from api.calc import bp as calc_bp
 from api.clean import bp as clean_bp
 from api.collect import bp as collect_bp
+from api.desensitize import bp as desensitize_bp
 from api.distribute import bp as distribute_bp  # noqa: F401
 from api.logs import bp as logs_bp
 from api.sources import bp as sources_bp
@@ -38,6 +39,7 @@ app.register_blueprint(logs_bp, url_prefix="/api")
 app.register_blueprint(clean_bp, url_prefix="/api")
 app.register_blueprint(calc_bp, url_prefix="/api")
 app.register_blueprint(distribute_bp, url_prefix="/api")
+app.register_blueprint(desensitize_bp, url_prefix="/api")
 
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 最大 512MB
 

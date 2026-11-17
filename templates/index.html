@@ -179,6 +179,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
 <link rel="stylesheet" href="/static/logs.css">
 <link rel="stylesheet" href="/static/clean.css">
 <link rel="stylesheet" href="/static/calc.css">
+<link rel="stylesheet" href="/static/desensitize.css">
 </head>
 <body>
 <div class="app">
@@ -203,6 +204,9 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
           <span class="nav-icon">📤</span><span class="nav-label">数据分发</span><span class="nav-arrow" id="distArrow">▾</span>
         </div>
         <div class="sub-steps" id="distSubSteps"></div>
+        <div class="nav-item" id="navDesensitize" onclick="goModule('desensitize')">
+          <span class="nav-icon">🛡️</span><span class="nav-label">全表脱敏</span>
+        </div>
       </div>
       <div class="nav-section">
         <div class="nav-title">运维</div>
@@ -502,6 +506,41 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
           <div id="result"></div>
         </div>
       </section>
+
+      <!-- 全表脱敏（独立功能，不走 6 步分发流程） -->
+      <section class="panel" data-module="desensitize">
+        <div class="page-head">
+          <div>
+            <h2>全表脱敏</h2>
+            <p class="page-sub">上传一个含多个子表的 Excel，自动识别每张子表里的手机号、身份证、银行卡、邮箱、地址并脱敏。只输出含敏感信息的子表，颜色、列宽、行高、合并单元格原样保留。姓名不脱敏，同格里的号码单独打星。</p>
+          </div>
+          <button class="btn btn-primary" id="desPickBtn" type="button" onclick="DES_pickFile()">选择 Excel 文件</button>
+        </div>
+
+        <div class="des-drop" id="desDrop">
+          <input type="file" id="desFile" accept=".xlsx,.xlsm,.xls" style="display:none">
+          <div class="des-drop-ic">🛡️</div>
+          <div class="des-drop-main" id="desDropMain">点击选择文件，或直接拖到这里</div>
+          <div class="des-drop-sub">支持 .xlsx / .xlsm；.xls 老格式请在 Excel 中另存为 .xlsx</div>
+        </div>
+
+        <div id="desScanWrap" style="display:none">
+          <div class="des-filebar" id="desFileBar"></div>
+          <div class="des-stats" id="desStats"></div>
+          <div class="des-sheet-list" id="desSheetList"></div>
+
+          <div class="des-runner">
+            <div class="des-dir">
+              <span class="des-dir-label">输出文件夹</span>
+              <input id="desOutdir" type="text" placeholder="点右侧按钮选择，或直接粘贴路径">
+              <button class="btn btn-ghost" type="button" onclick="DES_chooseDir()">选择</button>
+            </div>
+            <button class="btn btn-primary des-run-btn" id="desRunBtn" type="button" onclick="DES_run()">开始脱敏</button>
+          </div>
+        </div>
+
+        <div class="des-result" id="desResult"></div>
+      </section>
     </div>
 
     <div class="footer">
@@ -522,7 +561,7 @@ const STEPS=[
   {t:"输出位置",d:"目标文件夹"},
   {t:"确认拆分",d:"执行与结果"}
 ];
-const RULE_LABEL={phone:"手机号 138****5678",idcard:"身份证 前4后4",address:"详细地址 保留到区县",name:"姓名 留姓",keep_ab:"保留前/后几位",replace:"替换为文字",regex:"正则表达式 文内识别"};
+const RULE_LABEL={phone:"手机号 138****5678",idcard:"身份证 前4后4",address:"详细地址 保留到区县",name:"姓名 留姓",keep_ab:"保留前/后几位",replace:"替换为文字",regex:"正则表达式 文内识别",bankcard:"银行卡 保留后4位",email:"邮箱 保留前2位"};
 /* 「正则表达式」默认匹配式：11 位手机号，前后不能紧贴数字（防误伤 18 位身份证） */
 const RE_PHONE="(?<!\\d)1[3-9]\\d{9}(?!\\d)";
 const $=id=>document.getElementById(id);
@@ -1250,5 +1289,6 @@ renderNav();goStep(1);
 <script src="/static/logs.js"></script>
 <script src="/static/clean.js"></script>
 <script src="/static/calc.js"></script>
+<script src="/static/desensitize.js"></script>
 </body>
 </html>

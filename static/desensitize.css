@@ -1,0 +1,183 @@
+/* 全表脱敏 · 独立样式（复用 index.html 顶部的全局 CSS 变量与 .btn / .card） */
+
+/* ---------- 上传 ---------- */
+.des-drop {
+  background: #fff;
+  border: 2px dashed #b9cfca;
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: .18s;
+  box-shadow: var(--shadow);
+}
+.des-drop:hover,
+.des-drop.over {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.des-drop-ic { font-size: 27px; line-height: 1; margin-bottom: 9px; }
+.des-drop-main { font-size: 14.5px; font-weight: 700; color: var(--primary-d); }
+.des-drop-sub { font-size: 12.5px; color: var(--faint); margin-top: 5px; }
+
+/* ---------- 文件信息条 ---------- */
+.des-filebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 18px;
+  margin-top: 18px;
+  box-shadow: var(--shadow);
+}
+.des-filebar .ic {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: var(--primary-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex: none;
+}
+.des-filebar .fn { font-size: 14px; font-weight: 700; word-break: break-all; }
+.des-filebar .fs { font-size: 12.5px; color: var(--sub); margin-top: 1px; }
+.des-filebar .spacer { flex: 1; }
+
+/* ---------- 统计 ---------- */
+.des-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+@media (max-width: 1100px) { .des-stats { grid-template-columns: repeat(2, 1fr); } }
+.des-stat {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.des-stat .n { font-size: 24px; font-weight: 800; line-height: 1.2; }
+.des-stat .l { font-size: 12px; color: var(--sub); margin-top: 2px; }
+.des-stat.hit .n { color: var(--primary-d); }
+.des-stat.skip .n { color: var(--faint); }
+.des-stat.mask .n { color: var(--gold); }
+
+/* ---------- 子表卡片 ---------- */
+.des-sheet-list { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.des-sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+}
+.des-sheet.skip { opacity: .66; }
+.des-sheet-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.des-sheet-head .name { font-size: 14px; font-weight: 700; }
+.des-sheet-head .rows { font-size: 12px; color: var(--faint); }
+.des-sheet-head .spacer { flex: 1; }
+.des-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-d);
+}
+.des-tag.gray { background: #f1f4f3; color: var(--faint); }
+
+.des-cols {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 8px;
+}
+.des-col {
+  border: 1px solid #eaf1ef;
+  background: #fbfdfd;
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 12.5px;
+}
+.des-col .cname { font-weight: 700; }
+.des-col .kind {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--primary-d);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.des-col .by { margin-left: 4px; font-size: 11px; color: var(--faint); }
+.des-col .sample { color: var(--faint); margin-top: 3px; word-break: break-all; }
+.des-col .sample b { color: var(--primary-d); font-weight: 600; }
+
+/* ---------- 输出位置 + 执行 ---------- */
+.des-runner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px 18px;
+  margin-top: 18px;
+  box-shadow: var(--shadow);
+}
+.des-dir { display: flex; align-items: center; gap: 9px; flex: 1 1 380px; min-width: 0; }
+.des-dir-label { font-size: 13px; font-weight: 700; color: var(--primary-d); white-space: nowrap; }
+.des-dir input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid #cfe0dc;
+  border-radius: 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+.des-dir input:focus { outline: none; border-color: var(--primary); }
+.des-run-btn { padding: 11px 26px; font-size: 14.5px; flex: none; }
+
+/* ---------- 结果 ---------- */
+.des-result { margin-top: 18px; }
+.des-hero {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.des-hero .hic {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px; font-size: 26px; background: #e9f8ef;
+}
+.des-hero h3 { font-size: 18px; margin-bottom: 4px; }
+.des-hero p { color: var(--sub); font-size: 13px; word-break: break-all; }
+.des-hero .path {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12.5px;
+  background: #f6f9f8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  word-break: break-all;
+  color: var(--ink);
+}
+.des-out-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+@media (max-width: 900px) { .des-out-stats { grid-template-columns: 1fr; } }
+.des-out-stats .des-stat { text-align: center; }
+.des-out-sheets { margin-top: 14px; }
+.des-out-sheets .des-sheet { margin-top: 10px; }

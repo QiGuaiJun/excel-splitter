@@ -144,6 +144,16 @@ excel-splitter/
 | POST | /api/distribute/summary | 汇总表（分组/求和/计数） |
 | POST | /api/distribute/merge-sheets | 子表合并（加来源列） |
 
+### 4.5 全表脱敏
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/desensitize/scan | 上传工作簿并预扫描所有子表（multipart/form-data: file），返回每个子表命中的敏感列与样例 |
+| POST | /api/desensitize/run | 按 `file_id + output_dir` 执行脱敏，输出「一个文件多 sheet」（JSON） |
+| POST | /api/browse_folder | 复用分发模块的系统文件夹选择框 |
+
+`scan` 返回 `{ok, file_id, filename, sheets:[{name, rows, hits:[{col, kind, by, ratio, sample_in, sample_out}]}], hit_sheets, total_sheets}`；
+`run` 返回 `{ok, out_path, filename, sheets:[{name, rows, cols:[{col,kind,count}], masked}], skipped:[{name,rows}], total_masked, out_sheets, total_sheets}`。
+
 ---
 
 ## 五、功能开发进度
@@ -308,6 +318,39 @@ excel-splitter/
   列表模块统一 `renderLoadError()`，不要只留一块空白。
 - **模板改动需要重启服务**：Flask 非 debug 模式下 Jinja 缓存模板，改 `templates/*.html`
   后必须重启 `app.py` 才生效；`static/*` 刷新页面即可。
+
+### 5.8 全表脱敏 🟢
+
+独立功能页（左侧导航「数据链路 → 全表脱敏」），不进入 6 步分发流程：
+上传一个多子表工作簿 → 自动识别每个子表里的敏感列 → 一键脱敏 → 输出「一个文件多 sheet」，
+无敏感信息的子表不输出，全程不需要逐列配置。
+
+- [x] 敏感类型：手机号 / 身份证 / 银行卡 / 邮箱 / 详细地址（姓名有意不脱敏）
+- [x] 列名 + 内容双重判断（列名命中即处理；列名不明显时内容命中率 ≥ 80% 才处理）
+- [x] 只替换敏感片段，同格其他文字保留（「张三13812345678」→「张三138****5678」）
+- [x] 格式完全保留（列宽、行高、底色、字体、冻结窗格、合并单元格）
+- [x] 每次手动选输出文件夹，文件名 `{原文件名}_已脱敏.xlsx`，重名追加 `_2`
+- [x] 页面汇总：输出几个子表、每个子表哪些列脱了多少格、跳过了几个子表
+
+#### 实现要点（改动前必看）
+- **必须用 openpyxl 常规模式（`read_only=False`）**。`read_only` 的 `ReadOnlyCell` 拿不到
+  fill、无法就地写回；而 `services/excel_style.py` 那套「解 OOXML 包补底色」只在
+  pandas `to_excel` 之后需要，全表脱敏是不换引擎的原地改值，样式天然保留，不要绕路。
+- **预扫描用 read_only 流式读**（`scan_workbook`），只读前 300 行做内容判定，5 万行大表也能秒回；
+  执行阶段再 `load_workbook` 常规模式。两阶段共用 `services/detect.py`，保证"预览看到的"
+  就是"执行改的"。
+- **身份证 / 银行卡的严格校验只在"内容判定"时启用**：`mask_text(..., strict=True)` 要求
+  身份证校验位、银行卡 Luhn 通过，避免把 18 位流水号、16 位订单号当敏感号打掉；
+  列名命中的列走 `strict=False`，假号、测试数据也照样打码。
+- **姓名列不进脱敏清单**：`detect_sheet()` 主动过滤 `kind=name`。业务要求名单能认出人，
+  「姓名+手机号」同格时靠手机号的正则片段替换，只动号码。
+- **打码后统一写文本格式**（`cell.number_format = "@"`）：含 `*` 的值本身是文本，
+  但原列若是数值格式，Excel 会把长数字显示成科学计数法。
+- **阈值 0.8 而非 0.5**：自由文本列（备注、说明）偶尔出现一个号码很正常，
+  半数命中就整列打星会误伤正常内容。
+- **.xls 直接拒绝**并提示另存 xlsx：老格式无法做格式级改写。
+- **前端 init 走 `DES_init`**，在 `static/sources.js` 的 `MODULES` 里声明
+  `initName: "DES_init"`，由 `goModule()` 惰性解析（与其他模块同一套机制）。
 
 ---
 

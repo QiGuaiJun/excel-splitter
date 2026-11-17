@@ -49,6 +49,8 @@
                   initFn: null, initName: "CL_init",     showStepNav: false },
     calc:       { crumb: "数据链路", title: "数据计算",       navId: "navCalc",
                   initFn: null, initName: "CA_init",     showStepNav: false },
+    desensitize:{ crumb: "数据链路", title: "全表脱敏",       navId: "navDesensitize",
+                  initFn: null, initName: "DES_init",    showStepNav: false },
   };
 
   window.goModule = function(mod){
