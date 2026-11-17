@@ -17,7 +17,7 @@ import tempfile
 
 import pytest
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, PatternFill
 
 from app import app
 from services.detect import (
@@ -88,7 +88,9 @@ def build_sample(path):
     ws1.append(["张三", "13812345678", ID_OK, CARD_OK, "zhangsan@qq.com", "浙江省金华市义乌市稠城街道1号", "202401011234567890"])
     ws1.append(["李四", "13912345678", ID_OK, CARD_OK, "lisi@163.com", "浙江省杭州市西湖区文一路2号", "202401011234567891"])
     ws1.column_dimensions["A"].width = 18
+    ws1.row_dimensions[1].height = 26
     ws1["A1"].fill = PatternFill("solid", fgColor="FFC7CE")
+    ws1["A1"].font = Font(bold=True, size=12)
 
     ws2 = wb.create_sheet("订单流水")
     ws2.append(["订单号", "金额"])
@@ -271,9 +273,12 @@ class TestWorkbookFlow:
 
         wb = load_workbook(out)
         ws = wb["客户明细"]
-        assert ws.column_dimensions["A"].width == 18
-        assert ws["A1"].fill.fgColor.rgb.endswith("FFC7CE")
-        assert "A4:B4" in {str(r) for r in wb["活动名单"].merged_cells.ranges}
+        assert ws.column_dimensions["A"].width == 18          # 列宽
+        assert ws.row_dimensions[1].height == 26              # 行高
+        assert ws["A1"].fill.fgColor.rgb.endswith("FFC7CE")   # 底色
+        assert ws["A1"].font.bold is True                     # 字体
+        assert ws["A1"].font.sz == 12
+        assert "A4:B4" in {str(r) for r in wb["活动名单"].merged_cells.ranges}  # 合并单元格
         wb.close()
 
     def test_all_clean_creates_no_file(self, work_dir):
