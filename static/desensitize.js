@@ -26,15 +26,6 @@
   };
   const kindLabel = k => KIND_LABEL[k] || k;
 
-  // 一个列可能同时有多种类型（例如列名是手机号、内容里还混着邮箱）
-  function kindsTags(h) {
-    const ks = h.kinds || [];
-    return ks.map(k =>
-      '<span class="kind">' + kindLabel(k.kind) + '</span>' +
-      '<span class="by">' + (k.by === "name" ? "列名" : "内容") + '</span>'
-    ).join(" ");
-  }
-
   function toast(msg, type) {
     const t = document.createElement("div");
     t.className = "toast " + (type || "");
@@ -119,36 +110,9 @@
       '<div class="des-stat skip"><div class="n">' + skipSheets.length + '</div><div class="l">无敏感信息（不输出）</div></div>' +
       '<div class="des-stat mask"><div class="n">' + colCount + '</div><div class="l">待脱敏列</div></div>';
 
-    let html = "";
-    hitSheets.forEach(s => {
-      html += '<div class="des-sheet">' +
-        '<div class="des-sheet-head">' +
-        '<span class="name">' + esc(s.name) + '</span>' +
-        '<span class="rows">' + s.rows + ' 行</span>' +
-        '<span class="spacer"></span>' +
-        '<span class="des-tag">' + s.hits.length + ' 个敏感列</span>' +
-        '</div>' +
-        '<div class="des-cols">' + s.hits.map(h =>
-          '<div class="des-col">' +
-          '<div><span class="cname">' + esc(h.col) + '</span>' + kindsTags(h) + '</div>' +
-          '<div class="sample">' + esc(h.sample_in) + ' <b>→ ' + esc(h.sample_out) + '</b></div>' +
-          '</div>'
-        ).join("") + '</div>' +
-        '</div>';
-    });
-
-    skipSheets.forEach(s => {
-      const isName = (s.hits || []).some(h => h.kind === "name");
-      html += '<div class="des-sheet skip">' +
-        '<div class="des-sheet-head">' +
-        '<span class="name">' + esc(s.name) + '</span>' +
-        '<span class="rows">' + (s.rows || 0) + ' 行</span>' +
-        '<span class="spacer"></span>' +
-        '<span class="des-tag gray">' + (s.empty ? "空表 · 不输出" : (isName ? "只有姓名 · 不输出" : "无敏感信息 · 不输出")) + '</span>' +
-        '</div></div>';
-    });
-
-    $("desSheetList").innerHTML = html || '<div class="empty-state">这个工作簿里没有可识别的子表</div>';
+    // 明细卡片不再展示（页面保持简约）；统计卡已给出子表数与待脱敏列数
+    const list = $("desSheetList");
+    if (list) list.innerHTML = "";
 
     const outdirInput = $("desOutdir");
     if (outdirInput && DES.outdir) outdirInput.value = DES.outdir;

@@ -198,7 +198,7 @@ def detect_column(col_name, values):
     if by_name:
         kinds[by_name] = "name"
 
-    pairs = [(str(v).strip(), v) for v in values if str(v).strip() != ""][:MAX_SAMPLE]
+    pairs = [(str(v).strip(), v) for v in values if v is not None and str(v).strip() != ""][:MAX_SAMPLE]
     hit = 0
     for t, _ in pairs:
         ks = cell_kinds(t)
