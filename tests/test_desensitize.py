@@ -23,6 +23,7 @@ from app import app
 from services.detect import (
     _ID_C,
     _ID_W,
+    cell_kinds,
     detect_column,
     detect_sheet,
     idcard_ok,
@@ -79,14 +80,18 @@ def work_dir():
 
 
 def build_sample(path):
-    """造一个三子表工作簿：客户明细（敏感）/ 订单流水（干净）/ 活动名单（混合）。"""
+    """造一个三子表工作簿：客户明细（敏感）/ 订单流水（干净）/ 活动名单（混合）。
+
+    客户明细特意带上「买家姓名」「买家昵称」两列：前者整列是手机号，后者姓名+手机号，
+    用来复现"列名不可信、靠正则扫内容"的场景。
+    """
     wb = Workbook()
 
     ws1 = wb.active
     ws1.title = "客户明细"
-    ws1.append(["客户名称", "手机号", "身份证号", "银行卡号", "邮箱", "详细地址", "订单号"])
-    ws1.append(["张三", "13812345678", ID_OK, CARD_OK, "zhangsan@qq.com", "浙江省金华市义乌市稠城街道1号", "202401011234567890"])
-    ws1.append(["李四", "13912345678", ID_OK, CARD_OK, "lisi@163.com", "浙江省杭州市西湖区文一路2号", "202401011234567891"])
+    ws1.append(["客户名称", "手机号", "身份证号", "银行卡号", "邮箱", "详细地址", "订单号", "买家姓名", "买家昵称"])
+    ws1.append(["张三", "13812345678", ID_OK, CARD_OK, "zhangsan@qq.com", "浙江省金华市义乌市稠城街道1号", "202401011234567890", "13812345678", "小红13912345678"])
+    ws1.append(["李四", "13912345678", ID_OK, CARD_OK, "lisi@163.com", "浙江省杭州市西湖区文一路2号", "202401011234567891", "13612345678", "阿强"])
     ws1.column_dimensions["A"].width = 18
     ws1.row_dimensions[1].height = 26
     ws1["A1"].fill = PatternFill("solid", fgColor="FFC7CE")
@@ -144,31 +149,27 @@ class TestMaskEmail:
 class TestDetectByName:
     def test_phone_column(self):
         info = detect_column("联系电话", ["13812345678"])
-        assert info["kind"] == "phone"
-        assert info["by"] == "name"
+        assert info["kinds"][0] == {"kind": "phone", "by": "name"}
 
     def test_idcard_column(self):
         info = detect_column("身份证号", ["33070219900101123X"])
-        assert info["kind"] == "idcard"
-        assert info["by"] == "name"
+        assert info["kinds"][0] == {"kind": "idcard", "by": "name"}
 
     def test_bankcard_column(self):
-        assert detect_column("银行卡号", ["6222"])["kind"] == "bankcard"
+        assert detect_column("银行卡号", ["6222"])["kinds"][0]["kind"] == "bankcard"
 
     def test_email_column(self):
-        assert detect_column("电子邮箱", ["a@b.com"])["kind"] == "email"
+        assert detect_column("电子邮箱", ["a@b.com"])["kinds"][0]["kind"] == "email"
 
     def test_address_column(self):
-        assert detect_column("详细地址", ["浙江省金华市"])["kind"] == "address"
+        assert detect_column("详细地址", ["浙江省金华市"])["kinds"][0]["kind"] == "address"
 
-    def test_name_column_is_marked_but_not_masked(self):
-        info = detect_column("姓名", ["张三", "李四"])
-        assert info["kind"] == "name"
-        # detect_sheet 会把姓名列过滤掉，不出现在脱敏清单里
-        assert detect_sheet(["姓名", "手机号"], [["张三", "13812345678"]]) == [
-            {"col": "手机号", "kind": "phone", "by": "name", "ratio": 1.0,
-             "sample_in": "13812345678", "sample_out": "138****5678", "index": 1}
-        ]
+    def test_plain_name_column_not_in_list(self):
+        # 纯姓名列：没有任何号码片段，不进脱敏清单（姓名要保留）
+        assert detect_column("姓名", ["张三", "李四"]) is None
+        hits = detect_sheet(["姓名", "手机号"], [["张三", "13812345678"]])
+        assert [h["col"] for h in hits] == ["手机号"]
+        assert hits[0]["kinds"][0] == {"kind": "phone", "by": "name"}
 
 
 # ----------------------------------------------------------------------------
@@ -177,19 +178,21 @@ class TestDetectByName:
 class TestDetectByContent:
     def test_note_column_high_hit_ratio(self):
         values = ["13812345678", "13912345678", "13712345678", "13612345678", "无号码"]
-        assert detect_column("备注", values)["kind"] == "phone"
+        assert detect_column("备注", values)["kinds"][0]["kind"] == "phone"
 
-    def test_note_column_low_hit_ratio_skipped(self):
+    def test_single_phone_in_note_column_still_caught(self):
+        # 防漏优先：只要有一格出现手机号就处理，不再要求整列 80% 命中
         values = ["13812345678", "正常文字", "另一条备注", "随便写"]
-        assert detect_column("备注", values) is None
+        info = detect_column("备注", values)
+        assert info["kinds"][0]["kind"] == "phone"
+        assert info["kinds"][0]["by"] == "content"
 
     def test_order_number_not_mistaken_as_idcard(self):
         assert detect_column("订单号", ["202401011234567890", "202401011234567891"]) is None
 
     def test_name_plus_phone_column_uses_content_kind(self):
         info = detect_column("客户信息", ["王五13812345678", "赵六13912345678"])
-        assert info["kind"] == "phone"
-        assert info["by"] == "content"
+        assert info["kinds"][0] == {"kind": "phone", "by": "content"}
 
     def test_empty_column_ignored(self):
         assert detect_column("备注", ["", "", None]) is None
@@ -201,11 +204,41 @@ class TestDetectByContent:
 
 
 # ----------------------------------------------------------------------------
+# 字段名不可信：姓名 / 昵称里出现号码也要打码
+# ----------------------------------------------------------------------------
+class TestFieldNameAgnostic:
+    def test_name_column_full_of_phones_is_masked(self):
+        info = detect_column("买家姓名", ["13812345678", "13912345678"])
+        assert info["kinds"][0] == {"kind": "phone", "by": "content"}
+
+    def test_name_column_with_one_phone_still_caught(self):
+        info = detect_column("买家姓名", ["张三", "13812345678", "李四"])
+        assert info["kinds"][0] == {"kind": "phone", "by": "content"}
+
+    def test_nickname_embedded_phone_masked(self):
+        assert mask_text("phone", "小红13912345678") == "小红139****5678"
+
+    def test_plain_names_never_touched(self):
+        assert cell_kinds("张三") == []
+        assert cell_kinds("已付款") == []
+        assert detect_column("买家昵称", ["小明", "阿强"]) is None
+
+
+# ----------------------------------------------------------------------------
 # 片段替换
 # ----------------------------------------------------------------------------
 class TestMaskText:
     def test_mixed_cell_keeps_name(self):
         assert mask_text("phone", "张三13812345678") == "张三138****5678"
+
+    def test_phone_glued_after_digits(self):
+        # 昵称里"序号+号码"被拼成一串 12/13 位数字，尾部 11 位照样打码
+        assert mask_text("phone", "昵称013800000000") == "昵称0138****0000"
+        assert mask_text("phone", "昵称1213800000012") == "昵称12138****0012"
+
+    def test_twelve_digit_number_not_phone(self):
+        # 普通 12 位编号不能被当成粘连号码
+        assert cell_kinds("202401011234") == []
 
     def test_whole_cell_with_86_prefix(self):
         assert mask_text("phone", "+86 138 1234 5678") == "138****5678"
@@ -236,7 +269,12 @@ class TestWorkbookFlow:
         assert set(names) == {"客户明细", "订单流水", "活动名单"}
         assert [h["col"] for h in names["客户明细"]["hits"]] == [
             "手机号", "身份证号", "银行卡号", "邮箱", "详细地址",
+            "买家姓名", "买家昵称",
         ]
+        # 买家姓名两列都是"内容识别"出来的（列名不含任何号码关键词）
+        by_col = {h["col"]: h["kinds"][0]["by"] for h in names["客户明细"]["hits"]}
+        assert by_col["买家姓名"] == "content"
+        assert by_col["买家昵称"] == "content"
         assert names["订单流水"]["hits"] == []
         assert plan["hit_sheets"] == 2
 
@@ -261,6 +299,10 @@ class TestWorkbookFlow:
         assert ws["E2"].value == "zh***@qq.com"
         assert ws["F2"].value == "浙江省金华市义乌市****"    # 保留到区县
         assert ws["G2"].value == "202401011234567890"      # 订单号不动
+        # 列名不可信的两列：姓名列整列号码打码，昵称列只打号码
+        assert ws["H2"].value == "138****5678"
+        assert ws["I2"].value == "小红139****5678"
+        assert ws["I3"].value == "阿强"                     # 纯昵称不动
         # 混合单元格：姓名保留，号码打星
         ws3 = wb["活动名单"]
         assert ws3["B2"].value == "王五138****5678"

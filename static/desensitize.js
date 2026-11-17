@@ -26,6 +26,15 @@
   };
   const kindLabel = k => KIND_LABEL[k] || k;
 
+  // 一个列可能同时有多种类型（例如列名是手机号、内容里还混着邮箱）
+  function kindsTags(h) {
+    const ks = h.kinds || [];
+    return ks.map(k =>
+      '<span class="kind">' + kindLabel(k.kind) + '</span>' +
+      '<span class="by">' + (k.by === "name" ? "列名" : "内容") + '</span>'
+    ).join(" ");
+  }
+
   function toast(msg, type) {
     const t = document.createElement("div");
     t.className = "toast " + (type || "");
@@ -121,9 +130,7 @@
         '</div>' +
         '<div class="des-cols">' + s.hits.map(h =>
           '<div class="des-col">' +
-          '<div><span class="cname">' + esc(h.col) + '</span>' +
-          '<span class="kind">' + kindLabel(h.kind) + '</span>' +
-          '<span class="by">' + (h.by === "name" ? "列名识别" : "内容识别") + '</span></div>' +
+          '<div><span class="cname">' + esc(h.col) + '</span>' + kindsTags(h) + '</div>' +
           '<div class="sample">' + esc(h.sample_in) + ' <b>→ ' + esc(h.sample_out) + '</b></div>' +
           '</div>'
         ).join("") + '</div>' +
@@ -237,7 +244,7 @@
         '</div>' +
         '<div class="des-cols">' + (s.cols || []).map(c =>
           '<div class="des-col"><span class="cname">' + esc(c.col) + '</span>' +
-          '<span class="kind">' + kindLabel(c.kind) + '</span>' +
+          (c.kinds || []).map(k => '<span class="kind">' + kindLabel(k) + '</span>').join(" ") +
           '<div class="sample">' + c.count + ' 格</div></div>'
         ).join("") + '</div>' +
         '</div>'

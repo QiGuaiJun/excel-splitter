@@ -12,13 +12,13 @@ ReadOnlyCell 拿不到 fill / 列宽 / 合并单元格，也无法就地写回�
 两级入口
 --------
 - scan_workbook(path)：快速预扫描（read_only，只读前 300 行），产出每个子表
-  命中了哪些敏感列。前端"扫描结果"用它，几秒内返回。
+  命中了哪些敏感列、每个列有哪些类型。前端"扫描结果"用它，几秒内返回。
 - run_desensitize(src, out, ...)：正式执行（常规模式）。先扫一遍拿到同样的列
   清单，再逐列改值，最后保存。scan 与 run 共用 services/detect.py 的判定逻辑，
   保证"预览看到的"就是"执行改的"。
 
-姓名列有意不处理（业务要求：名单要能认出人）；「姓名+手机号」同格的，靠手机号
-片段替换只打号码。
+识别不看列名也生效：买家姓名、买家昵称这类字段里出现手机号，会被逐格片段扫描
+抓出来，只打号码、姓名文字保留。
 """
 import os
 import re
@@ -165,16 +165,21 @@ def run_desensitize(src_path: str, out_path: str, plan: dict = None) -> dict:
             masked_total = 0
             for h in hits:
                 idx = int(h["index"]) + 1
-                strict = h.get("by") == "content"
-                kind = h["kind"]
+                kinds = h.get("kinds") or []
+                if not kinds:
+                    continue
+                strict_map = {k["kind"]: (k["by"] == "content") for k in kinds}
                 count = 0
-                # 只遍历这一列，避免 5 万行 × 20 列的全表扫描
+                # 只遍历这一列，避免 5 万行 × 20 列的全表扫描；
+                # 一列里的多个类型在同一次遍历里串行应用。
                 for row in ws.iter_rows(min_row=2, min_col=idx, max_col=idx):
                     cell = row[0]
-                    if cell.value is None:
-                        continue
                     old = cell.value
-                    new = mask_text(kind, old, strict=strict)
+                    if old is None:
+                        continue
+                    new = old
+                    for k in kinds:
+                        new = mask_text(k["kind"], new, strict=strict_map[k["kind"]])
                     if new != old:
                         cell.value = new
                         # 打码后一律是文本（含 *）。原列若是数值格式，Excel 会把
@@ -185,7 +190,13 @@ def run_desensitize(src_path: str, out_path: str, plan: dict = None) -> dict:
                             pass
                         count += 1
                 if count:
-                    col_report.append({"col": h["col"], "kind": kind, "count": count})
+                    col_report.append(
+                        {
+                            "col": h["col"],
+                            "kinds": [k["kind"] for k in kinds],
+                            "count": count,
+                        }
+                    )
                     masked_total += count
 
             report["sheets"].append(

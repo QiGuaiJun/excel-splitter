@@ -512,7 +512,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
         <div class="page-head">
           <div>
             <h2>全表脱敏</h2>
-            <p class="page-sub">上传一个含多个子表的 Excel，自动识别每张子表里的手机号、身份证、银行卡、邮箱、地址并脱敏。只输出含敏感信息的子表，颜色、列宽、行高、合并单元格原样保留。姓名不脱敏，同格里的号码单独打星。</p>
+            <p class="page-sub">上传一个含多个子表的 Excel，所有字段的值都会逐个扫描：手机号、身份证、银行卡、邮箱出现即打码，不看列名叫什么。只输出含敏感信息的子表，颜色、列宽、行高、合并单元格原样保留。姓名本身不打码，里面的号码照打。</p>
           </div>
           <button class="btn btn-primary" id="desPickBtn" type="button" onclick="DES_pickFile()">选择 Excel 文件</button>
         </div>
