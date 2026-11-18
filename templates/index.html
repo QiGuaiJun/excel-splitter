@@ -910,7 +910,7 @@ function renderSum(){
       ${r.kind!=="none"?`<input type="text" class="glabel" placeholder="输出列名（可改）" value="${esc(r.label||gDefName)}" style="width:100%;margin-top:6px;padding:6px 9px;border:1px solid #cfdcd9;border-radius:8px;font-size:12.5px">`:""}</div>`;
   }).join(""):'<span style="color:var(--faint);font-size:12.5px">无可分组的文本字段</span>';
   // 数值指标区（顺序由 S.sumOrderNum 决定，按住行拖动即可调整）
-  const numCols=kept().filter(c=>isMeasure(c));
+  const numCols=kept().filter(c=>isMeasure(c)&&c!==S.split);
   const numOrder=S.sumTouched?orderList(numCols,"sumOrderNum"):numCols;
   $("sumMetricBody").innerHTML=numOrder.length?numOrder.map(c=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
@@ -972,7 +972,7 @@ function refreshPreview(){
   },260);
 }
 function metricLabels(){
-  const labs=[];kept().forEach(c=>{const r=S.role[c];if(!r||r.kind==="none")return;
+  const labs=[];kept().forEach(c=>{const r=S.role[c];if(!r||r.kind==="none")return;if(c===S.split)return;  // 拆分列不进汇总
     if(r.kind==="group"){const gl=r.label||c;labs.push({v:gl,t:"按 "+gl})}
     else{const lab=r.label||defaultLabel(c,r.kind);const tag=r.kind==="sum"?"（求和）":r.kind==="cdistinct"?"（去重计数）":"（行数）";labs.push({v:lab,t:lab+tag})}});
   return labs;
@@ -1028,8 +1028,10 @@ function sumConf(){
   if(!S.sumOn)return{enabled:false};
   const groups=[],sums=[],counts=[],order=[];
   // 没在汇总区手动调过顺序时，汇总列顺序直接跟第 2 步的字段顺序（拖字段，汇总就跟着变）
-  const seq=S.sumTouched?[...(S.sumOrderDim||[]),...(S.sumOrderNum||[])]:kept();
-  const rest=kept().filter(c=>!seq.includes(c));
+  // 拆分列不进汇总：每个文件只装一个市场，再列一遍市场是冗余
+  const notSplit=c=>c!==S.split;
+  const seq=(S.sumTouched?[...(S.sumOrderDim||[]),...(S.sumOrderNum||[])]:kept()).filter(notSplit);
+  const rest=kept().filter(c=>notSplit(c)&&!seq.includes(c));
   [...seq,...rest].forEach(c=>{const r=S.role[c];if(!r)return;
     if(r.kind==="group"){const lab=(r.label||"").trim()||c;groups.push({col:c,label:(r.label||"").trim()});order.push(lab)}
     else if(r.kind==="sum"){const lab=(r.label||defaultLabel(c,"sum")).trim()||defaultLabel(c,"sum");sums.push({col:c,label:lab});order.push(lab)}

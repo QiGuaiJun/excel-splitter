@@ -626,4 +626,35 @@ class TestPreviewColumnOrder:
         }).get_json()
         assert r["ok"], r.get("msg")
         assert r["columns"] == order
+        assert "归属市场" not in r["columns"]      # 拆分列不进汇总
         assert len(r["data"]) >= 1
+
+
+class TestSummaryExcludesSplitColumn:
+    """单个文件只装一个市场，汇总里再列一遍市场是冗余：前端不传，导出的汇总表也不能有它"""
+
+    def test_summary_sheet_has_no_split_column(self, client, out_dir):
+        cols = ["归属市场", "健康顾问", "订单号", "金额"]
+        rows = [
+            ["义乌", "王顾问", "D1", 100],
+            ["义乌", "李顾问", "D2", 50],
+            ["义乌", "王顾问", "D3", 30],
+        ]
+        file_id = _post_excel(client, pd.DataFrame(rows, columns=cols), sheet_name="S")
+        r = client.post("/api/split", json={
+            "file_id": file_id, "sheet": "S",
+            "keep_columns": cols, "mask": {},
+            "split_column": "归属市场", "suffix": "",
+            "output_dir": out_dir,
+            "summary": {
+                "enabled": True,
+                "groups": [{"col": "健康顾问"}],
+                "sums": [{"col": "金额", "label": "金额合计"}],
+                "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
+            },
+        }).get_json()
+        assert r["ok"], r.get("msg")
+        from openpyxl import load_workbook
+        hdr = [c.value for c in load_workbook(os.path.join(out_dir, "义乌.xlsx"))["汇总"][1]]
+        assert "归属市场" not in hdr
+        assert hdr == ["健康顾问", "订单数", "金额合计"]

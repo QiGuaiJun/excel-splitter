@@ -231,6 +231,9 @@ excel-splitter/
   **只从卡片右侧把手起手才拖**，点卡片其余区域仍是勾选/取消，两种操作不会互相抢。
   松手后 DOM 顺序写回 `S.fieldOrder`，`kept()` 按它排序，`keep_columns` 的顺序即导出列顺序
   （后端本来就按请求顺序写列，测试 `test_keep_columns_order_is_custom` 守住这一点）。
+- **拆分列不进汇总**：单个文件只装一个市场，汇总再列一遍市场是冗余。`sumConf()` 里用
+  `notSplit` 把 `S.split` 从 `seq` / `rest` 两处都过滤掉（手动顺序里带着它也会被滤），
+  `metricLabels()` 的排序下拉、`renderSum()` 的数值区同样排除，所以导出与预览都不会多这一列。
 - **汇总列顺序跟谁走**：默认跟随第 2 步的字段顺序（`S.sumTouched` 为 false 时 `sumConf()` 的
   `seq` 直接用 `kept()`），用户在第 2 步拖字段，汇总的维度/指标列顺序一起变。一旦在汇总区
   手动拖过（`finish` 里置 `S.sumTouched=true`），就改以汇总区的 `S.sumOrderDim/Num` 为准；
