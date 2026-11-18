@@ -715,7 +715,7 @@ function initCfg(){
     S.role[c]={kind:measure?"sum":(isSrc?"none":"group"),label:measure?defaultLabel(c,"sum"):""};
   });
   S.split="";
-  S.sumInited=false;S.pvMarket="";S.sumTouched=false;
+  S.sumInited=false;S.pvMarket="";S.sumTouched=false;S.sumOrderDim=[];S.sumOrderNum=[];
 }
 
 /* 步骤2：字段卡片 + 脱敏区 + 拆分列 */
@@ -844,6 +844,11 @@ function enableDragSort(container,selector,key,render,handle){
     if(!moved||!commit||!d)return;                    // 没有明确落点就不动，避免误改
     container.insertBefore(el,after?d.nextSibling:d);
     S[container.__sortKey]=items().map(x=>x.dataset.c);
+    if(container.__sortKey==="fieldOrder"){            // 第 2 步字段顺序变了：汇总列顺序跟着走
+      S.sumTouched=false;S.sumOrderDim=[];S.sumOrderNum=[];
+      renderFields();renderSum();return;
+    }
+    S.sumTouched=true;                                 // 汇总区手动调过顺序，之后以这里为准
     (container.__sortRender||renderSum)();
   };
   container.addEventListener("pointerdown",e=>{
@@ -888,7 +893,7 @@ function renderSum(){
   $("dimHint").innerHTML=S.split?`拆分列 <b>${esc(S.split)}</b> 按值各拆一份，不参与分组`:"<b>提示：</b>请先在第 2 步选择拆分列，此处才能预览";
   // 文本维度区（顺序由 S.sumOrderDim 决定，按住卡片拖动即可调整）
   const textCols=kept().filter(c=>!isMeasure(c)&&c!==S.split&&!isSrc(c));
-  const textOrder=orderList(textCols,"sumOrderDim");
+  const textOrder=S.sumTouched?orderList(textCols,"sumOrderDim"):textCols;
   $("sumGroupGrid").innerHTML=textOrder.length?textOrder.map(c=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const u=sh&&sh.colMeta&&sh.colMeta[c]?sh.colMeta[c].unique:0;
@@ -906,7 +911,7 @@ function renderSum(){
   }).join(""):'<span style="color:var(--faint);font-size:12.5px">无可分组的文本字段</span>';
   // 数值指标区（顺序由 S.sumOrderNum 决定，按住行拖动即可调整）
   const numCols=kept().filter(c=>isMeasure(c));
-  const numOrder=orderList(numCols,"sumOrderNum");
+  const numOrder=S.sumTouched?orderList(numCols,"sumOrderNum"):numCols;
   $("sumMetricBody").innerHTML=numOrder.length?numOrder.map(c=>{
     const r=S.role[c]||{kind:"none",label:""};S.role[c]=r;
     const on=r.kind!=="none";
@@ -1022,7 +1027,8 @@ function ruleText(c){
 function sumConf(){
   if(!S.sumOn)return{enabled:false};
   const groups=[],sums=[],counts=[],order=[];
-  const seq=[...(S.sumOrderDim||[]),...(S.sumOrderNum||[])];
+  // 没在汇总区手动调过顺序时，汇总列顺序直接跟第 2 步的字段顺序（拖字段，汇总就跟着变）
+  const seq=S.sumTouched?[...(S.sumOrderDim||[]),...(S.sumOrderNum||[])]:kept();
   const rest=kept().filter(c=>!seq.includes(c));
   [...seq,...rest].forEach(c=>{const r=S.role[c];if(!r)return;
     if(r.kind==="group"){const lab=(r.label||"").trim()||c;groups.push({col:c,label:(r.label||"").trim()});order.push(lab)}

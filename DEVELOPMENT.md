@@ -231,6 +231,10 @@ excel-splitter/
   **只从卡片右侧把手起手才拖**，点卡片其余区域仍是勾选/取消，两种操作不会互相抢。
   松手后 DOM 顺序写回 `S.fieldOrder`，`kept()` 按它排序，`keep_columns` 的顺序即导出列顺序
   （后端本来就按请求顺序写列，测试 `test_keep_columns_order_is_custom` 守住这一点）。
+- **汇总列顺序跟谁走**：默认跟随第 2 步的字段顺序（`S.sumTouched` 为 false 时 `sumConf()` 的
+  `seq` 直接用 `kept()`），用户在第 2 步拖字段，汇总的维度/指标列顺序一起变。一旦在汇总区
+  手动拖过（`finish` 里置 `S.sumTouched=true`），就改以汇总区的 `S.sumOrderDim/Num` 为准；
+  再回第 2 步拖一次字段顺序会清掉这两个数组并把 `sumTouched` 复位，重新跟随字段顺序。
 - `render` 参数让同一个拖拽实现能重绘不同区域：汇总区传 `renderSum`（默认），字段区传
   `renderFields`，所以拆分列下拉、脱敏区、输出列顺序都会跟着新顺序走。
 - **拖动过程只给指示、松手才落位**：第一版是 `pointermove` 里直接 `insertBefore` 让卡片实时

@@ -599,3 +599,31 @@ class TestTextOrderDistinct:
         rec = {row[iadv]: (row[iord], row[isum]) for row in sm.iter_rows(min_row=2, values_only=True)}
         assert rec["王顾问"] == (2, 350)
         assert rec["李顾问"] == (1, 30)
+
+
+# ----------------------------------------------------------------------------
+# 汇总列顺序：预览列顺序 = summary.order（页面"改字段顺序 → 汇总跟着变"就靠它）
+# ----------------------------------------------------------------------------
+class TestPreviewColumnOrder:
+    def test_preview_columns_follow_order(self, client, out_dir):
+        cols = ["归属市场", "健康顾问", "订单号", "金额"]
+        rows = [
+            ["丽水商务商超", "黄春燕", "DD001", 60],
+            ["丽水商务商超", "周美华", "DD002", 60],
+            ["丽水商务商超", "黄春燕", "DD003", 60],
+        ]
+        file_id = _post_excel(client, pd.DataFrame(rows, columns=cols), sheet_name="S")
+        order = ["金额合计", "订单数", "健康顾问"]      # 故意不按“维度在前”的默认排法
+        r = client.post("/api/preview", json={
+            "file_id": file_id, "sheets": ["S"], "split_column": "归属市场",
+            "summary": {
+                "enabled": True,
+                "groups": [{"col": "健康顾问"}],
+                "sums": [{"col": "金额", "label": "金额合计"}],
+                "counts": [{"col": "订单号", "label": "订单数", "distinct": True}],
+                "order": order,
+            },
+        }).get_json()
+        assert r["ok"], r.get("msg")
+        assert r["columns"] == order
+        assert len(r["data"]) >= 1
