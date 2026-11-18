@@ -215,22 +215,30 @@ excel-splitter/
 - [x] 明细保留源表单元格底色（.xlsx/.xlsm 实心填充；自动排序后不串行）
 - [x] 汇总表标签红色（Excel tabColor，明细标签保持默认，发给对方后一眼区分）
 - [x] 汇总字段可拖拽调顺序（按住维度卡 / 指标行拖到目标位置，预览与导出列顺序跟随）
+- [x] 保留字段可拖拽调顺序（按住字段卡右侧把手，输出文件的列顺序跟随；拆分列拖到最前即成为第一列）
 - [x] 表头冻结（导出 Excel 明细与汇总首行 freeze_panes="A2"；网页预览表头 sticky 吸顶）
 
 #### 汇总字段排序 + 表头冻结的实现要点
 - **顺序落在哪**：前端用 `S.sumOrderDim`（文本维度）与 `S.sumOrderNum`（数值指标）两个数组
   保存用户手调的顺序；`orderList()` 每次渲染把顺序对齐到当前字段集合（新字段追加末尾、
   已删除的剔除），所以换文件 / 改保留字段都不会把顺序带乱。
-- **拖拽而不是按钮**：`enableDragSort(container, selector, key)` 用 pointer 事件自己实现拖拽。
-  最初试过原生 HTML5 drag，但卡片大部分面积是 select，浏览器从控件上起手会直接取消拖动，
-  用户实测就是"拖不动"，所以换掉。现在：`pointerdown` 只排除 `input/select/textarea/button`
+- **拖拽而不是按钮**：`enableDragSort(container, selector, key, render, handle)` 用 pointer 事件
+  自己实现拖拽。最初试过原生 HTML5 drag，但卡片大部分面积是 select，浏览器从控件上起手会直接
+  取消拖动，用户实测就是"拖不动"，所以换掉。现在：`pointerdown` 只排除 `input/select/textarea/button`
   （这些控件上按下要能正常勾选、改类型、输列名），其余区域（左侧把手、字段名、卡片空白）
   都能起手；移动超过 5px 才进入拖拽态并加 `.dragging`，避免点一下就误判。
+- **保留字段顺序（第 2 步）**：字段卡整卡点击是"切换保留"，所以字段列表传了 `handle=".grip"`，
+  **只从卡片右侧把手起手才拖**，点卡片其余区域仍是勾选/取消，两种操作不会互相抢。
+  松手后 DOM 顺序写回 `S.fieldOrder`，`kept()` 按它排序，`keep_columns` 的顺序即导出列顺序
+  （后端本来就按请求顺序写列，测试 `test_keep_columns_order_is_custom` 守住这一点）。
+- `render` 参数让同一个拖拽实现能重绘不同区域：汇总区传 `renderSum`（默认），字段区传
+  `renderFields`，所以拆分列下拉、脱敏区、输出列顺序都会跟着新顺序走。
 - **拖动过程只给指示、松手才落位**：第一版是 `pointermove` 里直接 `insertBefore` 让卡片实时
   让位，卡片在鼠标下方来回跳、很难对准，用户反馈"拖动不方便"。现在改为：`pointermove` 只用
   `document.elementFromPoint()` 判断落在哪张卡的上半区 / 下半区，给那张卡加 `.drop-before` /
   `.drop-after`（卡片是左/右边缘高亮，指标行是上/下边缘高亮）作为插入位置提示；`pointerup`
-  时才真正 `insertBefore`，再把 DOM 顺序写回 `S[key]` 并 `renderSum()`。没有明确落点时保持原样，
+  时才真正 `insertBefore`，再把 DOM 顺序写回 `S[key]` 并重绘对应区域（汇总区 `renderSum`、
+  字段区 `renderFields`）。没有明确落点时保持原样，
   `pointercancel` 不写顺序，避免误改。
 - **监听只绑一次**：容器是常驻元素、`innerHTML` 每次重绘，所以 pointerdown 挂容器、
   pointermove / pointerup 挂 document，并用 `container.__sortBound` 去重，`key` /

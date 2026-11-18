@@ -191,6 +191,36 @@ class TestNormalSplit:
         nn = pd.read_excel(os.path.join(out_dir, "南宁市场8月测试（0826）.xlsx"), dtype=str).iloc[0]
         assert nn["详细地址"] == "广西壮族自治区南宁市兴宁区****"
 
+    def test_keep_columns_order_is_custom(self, client, out_dir):
+        """字段顺序可自定义：输出文件的列顺序 = keep_columns 里给的顺序，而不是原表列序"""
+        cols = ["市场", "健康顾问", "订单号", "金额", "手机号"]
+        rows = [
+            ["义乌市场", "张伟", "A001", 100, "13812345678"],
+            ["杭州市场", "李娜", "A002", 200, "13998765432"],
+        ]
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as w:
+            pd.DataFrame(rows, columns=cols).to_excel(w, sheet_name="明细", index=False)
+        buf.seek(0)
+        j = client.post(
+            "/api/inspect",
+            data={"file": (buf, "order.xlsx")},
+            content_type="multipart/form-data",
+        ).get_json()
+        assert j["ok"]
+        keep = ["金额", "市场", "手机号"]        # 故意打乱原表顺序
+        r = client.post("/api/split", json={
+            "file_id": j["file_id"], "sheet": "明细",
+            "keep_columns": keep, "mask": {},
+            "split_column": "市场", "suffix": "ord",
+            "output_dir": out_dir,
+        }).get_json()
+        assert r["ok"], r.get("msg")
+        f = os.path.join(out_dir, "义乌市场ord.xlsx")
+        assert os.path.exists(f)
+        assert list(pd.read_excel(f).columns) == keep
+        assert list(pd.read_excel(os.path.join(out_dir, "杭州市场ord.xlsx")).columns) == keep
+
 
 # ----------------------------------------------------------------------------
 # 正则表达式脱敏：文本里"姓名 + 手机号"混排，只动号码

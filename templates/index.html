@@ -94,6 +94,7 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .gcard,#sumMetricBody tr{cursor:grab}
 .gcard.dragging,#sumMetricBody tr.dragging{opacity:.45;border-style:dashed;cursor:grabbing}
 .gcard.dragging,#sumMetricBody tr.dragging{pointer-events:none}
+.fcard.dragging{opacity:.45;border-style:dashed;cursor:grabbing;pointer-events:none}
 .gcard.drop-before{box-shadow:inset 3px 0 0 var(--primary)}
 .gcard.drop-after{box-shadow:inset -3px 0 0 var(--primary)}
 #sumMetricBody tr.drop-before{box-shadow:inset 0 3px 0 var(--primary)}
@@ -389,7 +390,7 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
       <section class="panel" data-step="2">
         <div class="card">
           <h3>选择保留字段</h3>
-          <p class="desc">勾选要保留的字段（默认不勾）；没勾的字段不会出现在结果里。</p>
+          <p class="desc">勾选要保留的字段（默认不勾）；没勾的字段不会出现在结果里。按住卡片右侧把手拖动可调整顺序，输出文件就按这个顺序排（拆分列拖到最前，明细第一列就是它）。</p>
           <div class="tools">
             <button class="btn btn-ghost" id="allKeep" type="button">全选</button>
             <button class="btn btn-ghost" id="noneKeep" type="button">全不选</button>
@@ -561,7 +562,7 @@ const RULE_LABEL={phone:"手机号 138****5678",idcard:"身份证 前4后4",addr
 const RE_PHONE="(?<!\\d)1[3-9]\\d{9}(?!\\d)";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},split:"",suffix:"",suffixAuto:false,outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
+const S={data:null,sheets:[],srcName:"来源",srcMap:{},cfg:{},fieldOrder:[],split:"",suffix:"",suffixAuto:false,outdir:"",step:1,sumOn:true,includeDetail:true,role:{},sumInited:false,pvMarket:"",pvTimer:null,tpls:[],tplCur:"",tplMsgT:null};
 
 /* 自由导航：任意步骤可点 */
 let currentModule='distribute';
@@ -706,7 +707,7 @@ function ensureSuffix(){
   applySuffixHint();
 }
 function initCfg(){
-  const sh=mergedView();S.cfg={};S.role={};
+  const sh=mergedView();S.cfg={};S.role={};S.fieldOrder=[];
   const multi=pickedSheets().length>1;
   (sh?sh.columns:[]).forEach(c=>{
     const measure=isMeasure(c),isSrc=(multi&&c===(S.srcName||"来源"));
@@ -718,25 +719,35 @@ function initCfg(){
 }
 
 /* 步骤2：字段卡片 + 脱敏区 + 拆分列 */
-function kept(){return Object.keys(S.cfg).filter(c=>S.cfg[c].keep)}
+const GRIP_SVG='<svg width="9" height="13" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.5"/><circle cx="7" cy="3" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="7" cy="7" r="1.5"/><circle cx="3" cy="11" r="1.5"/><circle cx="7" cy="11" r="1.5"/></svg>';
+// 保留字段顺序 = 输出文件的列顺序；由 S.fieldOrder 决定（拖动卡片把手可调）
+function kept(){
+  const on=Object.keys(S.cfg).filter(c=>S.cfg[c].keep),set=new Set(on);
+  const arr=(S.fieldOrder||[]).filter(c=>set.has(c));
+  on.forEach(c=>{if(!arr.includes(c))arr.push(c)});
+  return arr;
+}
 function isMeasure(c){const sh=mergedView(),m=sh&&sh.colMeta&&sh.colMeta[c];return !!(m&&m.measure)}
 function renderFields(){
   const sh=mergedView();
-  $("fieldGrid").innerHTML=sh?sh.columns.map((c,i)=>{
+  const cols=sh?orderList(sh.columns,"fieldOrder"):[];
+  $("fieldGrid").innerHTML=sh?cols.map((c,i)=>{
     const cf=S.cfg[c]||{keep:false,mask:""};S.cfg[c]=cf;
     const tags=[];const isSrcNow=(pickedSheets().length>1&&c===(S.srcName||"来源"));if(isSrcNow)tags.push('<span class="mini-tag" style="background:var(--primary-soft);color:var(--primary-d)">合并生成</span>');if(isMeasure(c))tags.push('<span class="mini-tag num">数值</span>');if(cf.mask)tags.push('<span class="mini-tag mask">已脱敏</span>');
     return `<div class="fcard ${cf.keep?"on":""}" data-c="${esc(c)}">
-      <div class="fk"><input type="checkbox" class="keep" ${cf.keep?"checked":""}><span>${esc(c)}</span></div>
+      <div class="fk"><input type="checkbox" class="keep" ${cf.keep?"checked":""}><span class="nm" title="${esc(c)}">${esc(c)}</span><span class="grip" title="按住拖动可调整顺序">${GRIP_SVG}</span></div>
       <div class="fmeta">${tags.join("")||'<span class="mini-tag">列 '+(i+1)+'</span>'}</div>
     </div>`;
   }).join(""):'<span style="color:var(--faint);font-size:13px">请先在第 1 步选择文件和子表</span>';
   // 只绑定本步骤的字段卡；步骤 3 的汇总卡也用 .fcard，但复选框是 .gchk，全局选择会取到空节点
   document.querySelectorAll("#fieldGrid .fcard").forEach(card=>{
     const c=card.dataset.c,cf=S.cfg[c];
-    card.onclick=e=>{if(e.target.tagName==="INPUT")return;cf.keep=!cf.keep;if(!cf.keep)cf.mask="";if(S.split===c&&!cf.keep)S.split="";renderFields()};
+    card.onclick=e=>{if(e.target.tagName==="INPUT")return;if(e.target.closest(".grip"))return;cf.keep=!cf.keep;if(!cf.keep)cf.mask="";if(S.split===c&&!cf.keep)S.split="";renderFields()};
     card.querySelector(".keep").onchange=e=>{cf.keep=e.target.checked;if(!cf.keep)cf.mask="";if(S.split===c&&!cf.keep)S.split="";renderFields()};
   });
   const ks=kept();
+  // 字段顺序拖拽：从卡片右侧把手起手，松手写回 S.fieldOrder 并重绘（拆分列下拉、脱敏区、输出列顺序都跟着变）
+  enableDragSort($("fieldGrid"),".fcard","fieldOrder",renderFields,".grip");
   $("keepStat").textContent=ks.length?`已保留 ${ks.length} 个字段`:"尚未勾选字段";
   // 拆分列下拉
   $("splitSel").innerHTML='<option value="">— 请选择拆分列 —</option>'+ks.map(c=>`<option value="${esc(c)}"${S.split===c?" selected":""}>${esc(c)}</option>`).join("");
@@ -813,11 +824,12 @@ function orderList(cols,key){
   cols.forEach(c=>{if(!arr.includes(c))arr.push(c)});
   S[key]=arr;return arr;
 }
-// 汇总字段拖拽排序：按住卡片 / 行（或左侧把手）拖动，松手写回顺序并重绘（预览跟着变）
+// 字段列表 / 汇总字段拖拽排序：按住卡片 / 行（或左侧把手）拖动，松手写回顺序并重绘
 // 用 pointer 事件而不是 HTML5 drag —— 卡片大部分面积是 select，HTML5 drag 从控件上起手会被取消，
 // 用户就觉得"拖不动"；pointer 方案只排除 input/select/textarea，其余区域都能起手，触屏同样可用。
-function enableDragSort(container,selector,key){
+function enableDragSort(container,selector,key,render,handle){
   container.__sortKey=key;container.__sortSel=selector;
+  container.__sortRender=render||renderSum;container.__sortHandle=handle||"";
   if(container.__sortBound)return;
   container.__sortBound=true;
   let src=null,active=false,sx=0,sy=0,dest=null,destAfter=false;
@@ -832,11 +844,12 @@ function enableDragSort(container,selector,key){
     if(!moved||!commit||!d)return;                    // 没有明确落点就不动，避免误改
     container.insertBefore(el,after?d.nextSibling:d);
     S[container.__sortKey]=items().map(x=>x.dataset.c);
-    renderSum();
+    (container.__sortRender||renderSum)();
   };
   container.addEventListener("pointerdown",e=>{
     if(e.button!==0)return;
     if(e.target.closest("input,select,textarea,button"))return;  // 控件上按下 = 正常操作，不起拖
+    if(container.__sortHandle&&!e.target.closest(container.__sortHandle))return;  // 指定了把手就只从把手起手
     const it=e.target.closest(selOf());
     if(!it)return;
     src=it;sx=e.clientX;sy=e.clientY;active=false;
