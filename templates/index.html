@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Excel 智能分表脱敏工作台</title>
+<title>智能化数据分析工作台</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f9d8f'/%3E%3Cpath d='M8 21h4V12H8zM14 23h4V8h-4zM20 21h4v-7h-4z' fill='%23fff'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -11,79 +11,85 @@
   --line:#e6eceb;--primary:#0f9d8f;--primary-d:#0b7d72;--primary-soft:#e7f6f4;
   --ok:#15a34a;--err:#e03131;--err-soft:#fdecec;--gold:#d7a84a;
   --side1:#0b2925;--side2:#0e3b34;--shadow:0 10px 34px rgba(13,52,47,.08);--radius:16px;
+  /* 刻度：字号 12/14/16/20/24，圆角 6/8/12/16/full，间距 4/8/12/16/24/32/40 */
+  --fs-12:12px;--fs-14:14px;--fs-16:16px;--fs-20:20px;--fs-24:24px;
+  --r-xs:6px;--r-s:8px;--r-m:12px;--r-l:16px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 功能色：汇总模块专用，与品牌绿区分，不当装饰色用 */
+  --blue:#378add;--blue-d:#0c447c;--blue-soft:#eef6fd;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:"Microsoft YaHei","PingFang SC",-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6}
 .app{display:grid;grid-template-columns:250px 1fr;height:100vh;overflow:hidden}
-aside{background:linear-gradient(165deg,var(--side1),var(--side2));color:#cfe3de;display:flex;flex-direction:column;padding:22px 16px}
+aside{background:var(--side1);color:#cfe3de;display:flex;flex-direction:column;padding:22px 16px}
 .brand{display:flex;align-items:center;gap:11px;padding:0 8px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
-.brand .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#19b6a6,#0b7d72);display:flex;align-items:center;justify-content:center;flex:none}
-.brand h1{font-size:15px;color:#fff;font-weight:700}
-.brand p{font-size:11px;color:#7fa39c;margin-top:1px}
+.brand .logo{width:38px;height:38px;border-radius:12px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex:none}
+.brand h1{font-size:16px;color:#fff;font-weight:700}
+.brand p{font-size:12px;color:#7fa39c;margin-top:1px}
 .nav{margin-top:16px;display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
-.step{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;cursor:pointer;color:#9fc0b9;transition:.15s;border:1px solid transparent}
+.step{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:12px;cursor:pointer;color:#9fc0b9;transition:.3s var(--ease);border:1px solid transparent}
 .step:hover{background:rgba(255,255,255,.06)}
 .step .dot{width:25px;height:25px;border-radius:50%;background:rgba(255,255,255,.08);color:#cfe3de;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
-.step .t{font-size:13px;font-weight:600}
+.step .t{font-size:14px;font-weight:600}
 .step.active{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
 .step.active .dot{background:var(--primary);color:#fff;box-shadow:0 0 0 4px rgba(15,157,143,.2)}
 .step.active .t{color:#fff}
-.side-foot{margin-top:auto;padding:12px 12px 2px;border-top:1px solid rgba(255,255,255,.08);font-size:11.5px;color:#7fa39c;display:flex;gap:8px;align-items:flex-start}
+.side-foot{margin-top:auto;padding:12px 12px 2px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#7fa39c;display:flex;gap:8px;align-items:flex-start}
 main{display:flex;flex-direction:column;overflow:hidden}
-.topbar{padding:22px 40px 0;display:flex;align-items:flex-end;justify-content:space-between}
+.topbar{padding:24px 40px 0;display:flex;align-items:flex-end;justify-content:space-between}
 .topbar .crumb{font-size:12px;color:var(--faint);letter-spacing:1px}
-.topbar h2{font-size:22px;font-weight:700;margin-top:2px}
+.topbar h2{font-size:24px;font-weight:700;margin-top:2px}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--primary-d);background:var(--primary-soft);padding:6px 12px;border-radius:999px;font-weight:600}
-.tplbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fbfdfd;border:1px solid var(--line);border-radius:14px;padding:11px 16px;margin:16px 40px 0}
-.tplbar .tpl-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;color:var(--primary-d);white-space:nowrap}
+.tplbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fbfdfd;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:16px 40px 0}
+.tplbar .tpl-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--primary-d);white-space:nowrap}
 .tplbar .tpl-title svg{flex:none}
 .tplbar select{min-width:120px;flex:1 1 150px;max-width:240px}
-.tplbar .tpl-msg{font-size:12.5px;color:#8a6a12;background:#fdf6e3;border:1px solid #f0dcae;border-radius:8px;padding:5px 11px;display:none;line-height:1.5}
+.tplbar .tpl-msg{font-size:12px;color:#8a6a12;background:#fdf6e3;border:1px solid #f0dcae;border-radius:8px;padding:5px 11px;display:none;line-height:1.5}
 .tplbar .tpl-msg.show{display:inline-block}
 .tplbar .tpl-msg.warn{color:#a12828;background:#fdf0f0;border-color:#f0c9c9}
-.stage{flex:1;overflow-y:auto;padding:22px 40px 30px}
-.panel{display:none;animation:fade .25s ease}.panel.show{display:block}
+.stage{flex:1;overflow-y:auto;padding:24px 40px 32px}
+.panel{display:none;animation:fade .5s var(--ease)}.panel.show{display:block}
 /* 只做位移过渡，不依赖透明度：动画被浏览器节流/中断时内容依然可见，不会整页空白 */
 @keyframes fade{from{transform:translateY(8px)}to{transform:none}}
 .card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
-.card+.card{margin-top:18px}
-.card h3{font-size:15px;font-weight:700;margin-bottom:6px}
-.card .desc{color:var(--sub);font-size:13px;margin-bottom:18px}
+.card+.card{margin-top:16px}
+.card h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.card .desc{color:var(--sub);font-size:14px;margin-bottom:18px}
 /* 模块页头：标题与右侧操作按钮同行，空间不足时才换行 */
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .page-head > div{min-width:0;flex:1 1 320px}
-.page-head h2{font-size:22px;font-weight:700;color:var(--ink);line-height:1.35}
+.page-head h2{font-size:24px;font-weight:700;color:var(--ink);line-height:1.35}
 .page-head .btn{flex:none;white-space:nowrap}
-.page-sub{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.6}
-.drop{border:2px dashed #b9cfca;border-radius:14px;padding:38px 24px;text-align:center;cursor:pointer;transition:.18s;background:#fbfdfd}
+.page-sub{font-size:14px;color:var(--sub);margin-top:6px;line-height:1.6}
+.drop{border:2px dashed #b9cfca;border-radius:12px;padding:32px 24px;text-align:center;cursor:pointer;transition:.3s var(--ease);background:#fbfdfd}
 .drop:hover,.drop.over{border-color:var(--primary);background:var(--primary-soft)}
-.drop .ic{width:52px;height:52px;margin:0 auto 10px;border-radius:14px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center}
-.drop .big{font-size:15px;font-weight:700}.drop .small{font-size:12.5px;color:var(--faint);margin-top:5px}
-.file-pick{display:flex;align-items:center;gap:14px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:13px 16px;margin-bottom:20px}
-.file-pick .fi{width:40px;height:40px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.drop .ic{width:52px;height:52px;margin:0 auto 12px;border-radius:12px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center}
+.drop .big{font-size:16px;font-weight:700}.drop .small{font-size:12px;color:var(--faint);margin-top:5px}
+.file-pick{display:flex;align-items:center;gap:12px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:12px 16px;margin-bottom:24px}
+.file-pick .fi{width:40px;height:40px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none}
 .file-pick .fn{font-weight:700;font-size:14px;word-break:break-all}.file-pick .fs{font-size:12px;color:var(--primary-d)}
-.linkbtn{margin-left:auto;color:var(--primary-d);font-weight:600;font-size:13px;cursor:pointer;background:none;border:none;white-space:nowrap}
-.sheet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px}
-.sheet-opt{border:2px solid var(--line);border-radius:13px;padding:15px;cursor:pointer;transition:.15s;background:#fff}
+.linkbtn{margin-left:auto;color:var(--primary-d);font-weight:600;font-size:14px;cursor:pointer;background:none;border:none;white-space:nowrap}
+.sheet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.sheet-opt{border:2px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:.3s var(--ease);background:#fff}
 .sheet-opt:hover{border-color:#9fd6d0}.sheet-opt.sel{border-color:var(--primary);background:var(--primary-soft)}
-.sheet-opt .sn{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.sheet-opt .sn{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
 .sheet-opt .sc{font-size:12px;color:var(--sub);margin-top:5px}
 .sheet-opt .tick{margin-left:auto;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;display:none;align-items:center;justify-content:center;flex:none}
 .sheet-opt.sel .tick{display:flex}
-.tools{display:flex;gap:9px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
-.btn{font-family:inherit;cursor:pointer;border-radius:10px;font-size:13.5px;font-weight:600;padding:9px 16px;border:1px solid transparent;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+.tools{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.btn{font-family:inherit;cursor:pointer;border-radius:8px;font-size:14px;font-weight:600;padding:8px 16px;border:1px solid transparent;transition:.3s var(--ease);display:inline-flex;align-items:center;gap:8px}
 .btn-ghost{background:#f1f5f4;color:#334844;border-color:var(--line)}.btn-ghost:hover{background:#e6eeec}
 .btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 18px rgba(15,157,143,.28)}.btn-primary:hover{background:var(--primary-d)}
 .btn-primary:disabled{background:#b6c9c5;box-shadow:none;cursor:not-allowed}
-select,input[type=text]{font-family:inherit;font-size:13.5px;padding:8px 11px;border:1px solid #cfdcd9;border-radius:9px;background:#fff;color:var(--ink)}
+select,input[type=text]{font-family:inherit;font-size:14px;padding:8px 11px;border:1px solid #cfdcd9;border-radius:8px;background:#fff;color:var(--ink)}
 select:focus,input[type=text]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(15,157,143,.12)}
 select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
-.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.fcard{border:1.5px solid var(--line);border-radius:11px;padding:11px 12px;cursor:pointer;transition:.13s;background:#fff;display:flex;flex-direction:column;gap:7px}
+.field-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.fcard{border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;transition:.3s var(--ease);background:#fff;display:flex;flex-direction:column;gap:8px}
 .fcard:hover{border-color:#9fd6d0}
 .fcard.on{border-color:var(--primary);background:var(--primary-soft)}
-.fcard .fk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.fcard .fk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
 .fcard .fk input{width:16px;height:16px;accent-color:var(--primary);flex:none}
 .fcard .fmeta{display:flex;gap:6px;flex-wrap:wrap}
 .fcard .fk .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -100,9 +106,9 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 #sumMetricBody tr.drop-before{box-shadow:inset 0 3px 0 var(--primary)}
 #sumMetricBody tr.drop-after{box-shadow:inset 0 -3px 0 var(--primary)}
 .drag-active,.drag-active *{user-select:none!important}
-.suffix-ai{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12.5px;color:var(--sub);flex-wrap:wrap}
-.suffix-ai .ai-ico{color:var(--primary);font-size:13px}
-.suffix-ai .mini{height:26px;padding:0 10px;font-size:12px;border-radius:7px;border:1px solid var(--line);
+.suffix-ai{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.suffix-ai .ai-ico{color:var(--primary);font-size:14px}
+.suffix-ai .mini{height:26px;padding:0 10px;font-size:12px;border-radius:6px;border:1px solid var(--line);
   background:#fff;color:var(--sub);cursor:pointer;font-family:inherit}
 .suffix-ai .mini:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
 .gcard{border-color:#cfe0ee}
@@ -110,68 +116,81 @@ select:disabled,input:disabled{background:#f2f5f4;color:#a9bbb6}
 .gcard .fk{color:#0c447c}
 .gcard select{margin-top:2px}
 .dim-hint{font-size:12px;color:#0c447c;background:#eef6fd;border:1px solid #d4e5f4;border-radius:8px;padding:7px 10px;margin-bottom:10px}
-.mini-tag{font-size:10.5px;padding:1px 7px;border-radius:6px;font-weight:600;background:#eef2f1;color:var(--sub)}
+.mini-tag{font-size:12px;padding:1px 7px;border-radius:6px;font-weight:600;background:#eef2f1;color:var(--sub)}
 .mini-tag.num{background:#fff3df;color:#b07a1a}.mini-tag.mask{background:#fdecec;color:#c0392b}
-.sub-block{border:1px dashed #cfe0dd;border-radius:12px;padding:16px 18px;margin-top:18px;background:#fbfdfd}
-.sub-block .lab{font-size:13.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:3px}
+.sub-block{border:1px dashed #cfe0dd;border-radius:12px;padding:16px;margin-top:16px;background:#fbfdfd}
+.sub-block .lab{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;row-gap:3px}
 .sub-block .lab .lab-t{flex:none;white-space:nowrap}
 .sub-block .lab .step-hint{font-weight:400;font-size:12px;color:var(--faint);flex:1 1 180px;min-width:0;line-height:1.55}
 .mask-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
-.mask-item{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.mask-item{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
 .mask-item .mn{width:120px;flex:none;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mask-item select{flex:1;min-width:180px}
-.opt-extra{font-size:12.5px;color:var(--sub);display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.opt-extra{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:2px;flex-wrap:wrap}
 .opt-extra input{width:44px;padding:6px 7px;margin:0 2px}
 .opt-extra input.re{width:260px;max-width:100%;flex:1 1 240px;font-family:Consolas,"Courier New",monospace}
 .switch{position:relative;width:42px;height:23px;display:inline-block}.switch input{display:none}
-.switch i{position:absolute;inset:0;background:#cdd8d5;border-radius:999px;transition:.18s;cursor:pointer}
-.switch i:after{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.18s}
+.switch i{position:absolute;inset:0;background:#cdd8d5;border-radius:999px;transition:.3s var(--ease);cursor:pointer}
+.switch i:after{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s var(--ease)}
 .switch input:checked+i{background:var(--primary)}.switch input:checked+i:after{transform:translateX(19px)}
 .table-wrap{border:1px solid var(--line);border-radius:12px;overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead th{background:#f6f9f8;text-align:left;font-size:12px;color:var(--sub);font-weight:700;padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
 /* 预览表头吸顶：表格纵向滚动时列名始终可见（border-collapse 下用内阴影补分隔线） */
 #pvThead th{position:sticky;top:0;z-index:2;background:#f6f9f8;box-shadow:inset 0 -1px 0 var(--line)}
-tbody td{padding:10px 14px;border-bottom:1px solid #f0f4f3;font-size:13.5px}
+tbody td{padding:10px 14px;border-bottom:1px solid #f0f4f3;font-size:14px}
 tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbody tr.masked{background:#f3faf9}
 .fname{font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.col-tag{font-size:10.5px;background:#eef2f1;color:var(--sub);padding:1px 7px;border-radius:6px;font-weight:600}.num-tag{background:#fff3df;color:#b07a1a}
-.big-input{width:100%;font-size:15px;padding:13px 15px}
-.name-preview{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;background:#f6faf9;border:1px solid #cfe7e3;border-radius:12px;padding:15px 17px}
-.name-preview .chip{background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:4px 11px;border-radius:8px}
+.col-tag{font-size:12px;background:#eef2f1;color:var(--sub);padding:1px 7px;border-radius:6px;font-weight:600}.num-tag{background:#fff3df;color:#b07a1a}
+.big-input{width:100%;font-size:16px;padding:13px 15px}
+.name-preview{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;background:#f6faf9;border:1px solid #cfe7e3;border-radius:12px;padding:16px 17px}
+.name-preview .chip{background:var(--primary);color:#fff;font-weight:700;font-size:14px;padding:4px 11px;border-radius:8px}
 .name-preview .note{width:100%;font-size:12px;color:var(--sub);margin-top:4px}
-.path-row{display:flex;gap:10px}.path-row input{flex:1;font-size:14px}
-.dir-hint{margin-top:12px;font-size:12.5px;color:var(--sub);display:flex;gap:8px;align-items:flex-start}
-.sum-toggle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:10px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.path-row{display:flex;gap:12px}.path-row input{flex:1;font-size:14px}
+.dir-hint{margin-top:12px;font-size:12px;color:var(--sub);display:flex;gap:8px;align-items:flex-start}
+.sum-toggle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:12px;background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:12px;padding:14px 16px;margin-bottom:18px}
 .sum-toggle .tt{font-weight:700}.sum-toggle .ts{font-size:12px;color:var(--primary-d)}
-.sum-toggle .sum-label{font-size:13.5px;font-weight:700;color:var(--ink);flex:none;white-space:nowrap}
-.sum-toggle .sum-opt{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;flex:none;white-space:nowrap}
+.sum-toggle .sum-label{font-size:14px;font-weight:700;color:var(--ink);flex:none;white-space:nowrap}
+.sum-toggle .sum-opt{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;flex:none;white-space:nowrap}
 .sum-toggle .sum-opt input{accent-color:var(--primary)}
 .sum-toggle .sum-note{font-size:12px;color:var(--faint);flex:1 1 220px;min-width:0;line-height:1.55}
 .sum-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:1280px){.sum-grid{grid-template-columns:minmax(0,1fr)}}
 .summary{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.summary .k{background:#f6f9f8;padding:12px 16px;font-size:12.5px;color:var(--sub);border-bottom:1px solid var(--line);font-weight:600}
-.summary .v{padding:12px 16px;font-size:13.5px;font-weight:600;border-bottom:1px solid var(--line);word-break:break-all}
+.summary .k{background:#f6f9f8;padding:12px 16px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--line);font-weight:600}
+.summary .v{padding:12px 16px;font-size:14px;font-weight:600;border-bottom:1px solid var(--line);word-break:break-all}
 .summary .k:nth-last-child(2),.summary .v:last-child{border-bottom:none}
 .result-hero{text-align:center;padding:26px 20px 6px}
 .result-hero .ric{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
 .result-hero.ok .ric{background:#e9f8ef}.result-hero.err .ric{background:var(--err-soft)}
-.result-hero h3{font-size:20px;margin-bottom:4px}.result-hero p{color:var(--sub);font-size:13.5px;word-break:break-all}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
-.stat{background:#f8fbfa;border:1px solid var(--line);border-radius:13px;padding:16px;text-align:center}
-.stat .n{font-size:26px;font-weight:800;color:var(--primary-d)}.stat .l{font-size:12px;color:var(--sub);margin-top:2px}
+.result-hero h3{font-size:20px;margin-bottom:4px}.result-hero p{color:var(--sub);font-size:14px;word-break:break-all}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}
+.stat{background:#f8fbfa;border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center}
+.stat .n{font-size:24px;font-weight:800;color:var(--primary-d)}.stat .l{font-size:12px;color:var(--sub);margin-top:2px}
 .filelist{max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:12px}
-.fi-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f0f4f3;font-size:13px}.fi-row:last-child{border-bottom:none}
+.fi-row{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid #f0f4f3;font-size:14px}.fi-row:last-child{border-bottom:none}
 .fi-row .cnt{margin-left:auto;color:var(--faint);font-size:12px;white-space:nowrap}
-.alert{border-radius:12px;padding:14px 16px;font-size:13.5px;margin-top:16px}
+.alert{border-radius:12px;padding:14px 16px;font-size:14px;margin-top:16px}
 .alert.err{background:var(--err-soft);border:1px solid #f3c0c0;color:#a12828}
-.alert table{margin-top:10px;font-size:12.5px;background:#fff;border-radius:8px;width:100%}
-.alert th{background:#fbe4e4}.alert th,.alert td{border:1px solid #f0c9c9;padding:6px 10px;text-align:left}
+.alert table{margin-top:10px;font-size:12px;background:#fff;border-radius:8px;width:100%}
+.alert th{background:#fbe4e4}.alert th,.alert td{border:1px solid #f0c9c9;padding:8px 12px;text-align:left}
 .footer{padding:16px 40px;border-top:1px solid var(--line);background:#fff;display:flex;align-items:center;gap:12px}
 .footer .spacer{flex:1}
+/* 首屏引导：只在还没选文件时出现，选完文件让位给操作界面 */
+.intro{padding:24px 40px 0}
+.intro-kicker{font-size:var(--fs-12);color:var(--faint);letter-spacing:.5px}
+.intro h1{font-size:var(--fs-24);line-height:1.4;font-weight:700;max-width:680px;margin-top:8px}
+.intro-lead{font-size:var(--fs-14);color:var(--sub);max-width:680px;margin-top:8px;line-height:1.7}
+.intro-flow{display:inline-block;margin-top:16px;padding:6px 12px;font-size:var(--fs-12);color:var(--primary-d);background:var(--primary-soft);border:1px solid #bfe6e1;border-radius:var(--r-s)}
+.intro-actions{display:flex;gap:8px;margin-top:16px}
+.intro-note{font-size:var(--fs-12);color:var(--faint);margin-top:12px}
+/* 模板栏：默认收起，把首屏主动权还给上传 */
+.tplbar.collapsed .tpl-body{display:none}
+.tpl-toggle{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-14);font-weight:700;color:var(--primary-d);background:none;border:none;flex:none}
+.tpl-arrow{font-size:var(--fs-12);color:var(--sub)}
+.tpl-body{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1}
 .btn-back{background:#fff;border-color:var(--line);color:var(--sub)}.btn-back:hover{background:#f4f7f6}
-.btn-next{padding:11px 28px;font-size:14.5px}
+.btn-next{padding:11px 28px;font-size:14px}
 .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:10px}.brand{border:none;padding:0 12px 0 0}.nav{flex-direction:row;margin:0}.step .d,.side-foot{display:none}.stage,.topbar,.footer{padding-left:18px;padding-right:18px}.summary{grid-template-columns:1fr}}
@@ -187,52 +206,69 @@ tbody tr:last-child td{border-bottom:none}tbody tr:hover{background:#fafcfc}tbod
   <aside>
     <div class="brand">
       <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M15 15l2 2 4-4" stroke="#7fe0d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div><h1>分表脱敏工作台</h1><p>Split · Mask · Summary</p></div>
+      <div><h1>智能化数据分析工作台</h1><p>采集 · 清洗 · 计算 · 分发</p></div>
     </div>
     <nav class="nav" id="nav">
       <div class="nav-section">
         <div class="nav-title">数据链路</div>
         <div class="nav-item" id="navSources" onclick="goModule('sources')">
-          <span class="nav-icon">📥</span><span class="nav-label">数据采集</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 4v10m0 0l-3.5-3.5M12 14l3.5-3.5" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 18h14" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">数据采集</span>
         </div>
         <div class="nav-item" id="navClean" onclick="goModule('clean')">
-          <span class="nav-icon">🧹</span><span class="nav-label">数据清洗</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 5h16l-6.5 7.5V19l-3 1.5v-8z" stroke="#9fc0b9" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">数据清洗</span>
         </div>
         <div class="nav-item" id="navCalc" onclick="goModule('calc')">
-          <span class="nav-icon">🧮</span><span class="nav-label">数据计算</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2" stroke="#9fc0b9" stroke-width="1.8"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">数据计算</span>
         </div>
         <div class="nav-item has-sub" id="navDistribute" onclick="toggleDistribute()">
-          <span class="nav-icon">📤</span><span class="nav-label">数据分发</span><span class="nav-arrow" id="distArrow">▾</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 20V8m0 0l-3.5 3.5M12 8l3.5 3.5" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 4h14" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">数据分发</span><span class="nav-arrow" id="distArrow">▾</span>
         </div>
         <div class="sub-steps" id="distSubSteps"></div>
         <div class="nav-item" id="navDesensitize" onclick="goModule('desensitize')">
-          <span class="nav-icon">🛡️</span><span class="nav-label">全表脱敏</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" stroke="#9fc0b9" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">全表脱敏</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-title">运维</div>
         <div class="nav-item" id="navLogs" onclick="goModule('logs')">
-          <span class="nav-icon">🕐</span><span class="nav-label">运行历史</span>
+          <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#9fc0b9" stroke-width="1.8"/><path d="M12 8v4l3 2" stroke="#9fc0b9" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">运行历史</span>
         </div>
       </div>
     </nav>
-    <div class="side-foot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="#7fa39c" stroke-width="1.6" stroke-linejoin="round"/></svg><span>本地运行，数据不离开本机</span></div>
+    <div class="side-foot"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" stroke="#7fa39c" stroke-width="1.6" stroke-linejoin="round"/></svg><span>本地版</span></div>
   </aside>
 
   <main>
-    <div class="topbar">
+    <div class="topbar" id="topbar">
       <div><div class="crumb" id="crumb">STEP 1 / 6</div><h2 id="title">文件与子表</h2></div>
       <div class="badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#0b7d72" stroke-width="2"/><path d="M8 12l3 3 5-6" stroke="#0b7d72" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>本地处理 · 安全</div>
     </div>
 
-    <div class="tplbar" id="tplbar">
-      <div class="tpl-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 4h6m-6 0a2 2 0 00-2 2v14a2 2 0 002 2h6a2 2 0 002-2V6a2 2 0 00-2-2m-6 0V2h6v2M7 10h10M7 14h6" stroke="#0b7d72" stroke-width="1.8" stroke-linecap="round"/></svg>配置模板</div>
-      <select id="tplSel" title="选择要套用的模板"><option value="">— 选择模板 —</option></select>
-      <button class="btn btn-ghost" id="tplApply" type="button">套用</button>
-      <button class="btn btn-ghost" id="tplSave" type="button">保存当前配置</button>
-      <button class="btn btn-ghost" id="tplRename" type="button">重命名</button>
-      <button class="btn btn-ghost" id="tplDel" type="button">删除</button>
-      <span class="tpl-msg" id="tplMsg"></span>
+    <section class="intro" id="intro">
+      <p class="intro-kicker">本地数据处理工作台</p>
+      <h1>一张多市场表格，拆成按市场分的文件</h1>
+      <p class="intro-lead">上传后选字段、设脱敏、配汇总，一次导出多份带汇总 Sheet 的明细文件。文件只在本机读取。</p>
+      <p class="intro-flow">选文件 → 选字段与脱敏 → 配汇总 → 命名 → 选输出 → 执行</p>
+      <div class="intro-actions">
+        <button class="btn btn-primary" id="bookDemo" type="button" onclick="openDemo()">预约演示</button>
+        <button class="btn btn-ghost" id="introUpload" type="button" onclick="document.getElementById('file').click()">直接上传文件</button>
+      </div>
+      <p class="intro-note">本地运行，数据不离开本机</p>
+    </section>
+
+    <div class="tplbar collapsed" id="tplbar">
+      <button class="tpl-toggle" id="tplToggle" type="button" onclick="toggleTpl()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4h6m-6 0a2 2 0 00-2 2v14a2 2 0 002 2h6a2 2 0 002-2V6a2 2 0 00-2-2m-6 0V2h6v2M7 10h10M7 14h6" stroke="#0b7d72" stroke-width="1.8" stroke-linecap="round"/></svg>
+        用模板快速开始<span class="tpl-arrow" id="tplArrow">▸</span>
+      </button>
+      <div class="tpl-body" id="tplBody">
+        <select id="tplSel" title="选择要套用的模板"><option value="">— 选择模板 —</option></select>
+        <button class="btn btn-ghost" id="tplApply" type="button">套用</button>
+        <button class="btn btn-ghost" id="tplSave" type="button">保存当前配置</button>
+        <button class="btn btn-ghost" id="tplRename" type="button">重命名</button>
+        <button class="btn btn-ghost" id="tplDel" type="button">删除</button>
+        <span class="tpl-msg" id="tplMsg"></span>
+      </div>
     </div>
 
     <div class="stage">
@@ -578,6 +614,26 @@ function renderNav(){
   if(currentModule==='sources')$("navSources")&&$("navSources").classList.add("active");
   if(currentModule==='distribute')$("navDistribute")&&$("navDistribute").classList.add("active");
 }
+/* 首屏引导：未选文件时显示介绍，选完文件让位给 STEP 操作界面 */
+const DEMO_CONTACT="";   /* 填邮箱 / 企微 / 表单链接后，“预约演示”直接跳转；留空则显示接入说明 */
+function updateIntro(){
+  const intro=$("intro"); if(!intro) return;
+  const hasData=!!(S.data&&S.data.sheets&&S.data.sheets.length);
+  const home=currentModule==='distribute'&&S.step===1&&!hasData;
+  intro.style.display=home?"":"none";
+  const tb=$("topbar"); if(tb) tb.style.display=home?"none":"flex";
+}
+function toggleTpl(){
+  const bar=$("tplbar"), arrow=$("tplArrow"); if(!bar) return;
+  const collapsed=bar.classList.toggle("collapsed");
+  if(arrow) arrow.textContent=collapsed?"▸":"▾";
+}
+function openDemo(){
+  if(DEMO_CONTACT){window.open(DEMO_CONTACT,"_blank");return;}
+  const body=$("demoBody"); if(!body) return;
+  body.innerHTML='<p style="margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.7">演示预约通道还没接入。把邮箱、企微或表单链接填到脚本里的 DEMO_CONTACT，这个按钮就会直接跳转。</p><button class="btn btn-ghost" type="button" onclick="hideModal(\'demoModal\')">知道了</button>';
+  if(window.showModal) showModal("demoModal");
+}
 function goStep(n){
   if(n<1||n>TOTAL)return;
   currentModule='distribute';
@@ -592,6 +648,7 @@ function goStep(n){
   if(n===4)ensureSuffix();
   if(n===TOTAL)renderConfirm();
   renderNav();
+  updateIntro();
 }
 
 /* 步骤1：文件+子表 */
@@ -613,7 +670,7 @@ async function upload(){
     $("dropBig").textContent="点击重新选择，或拖拽替换文件";
     $("fileInfo").innerHTML=`<div class="file-pick"><div class="fi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" fill="#dff1ef"/><path d="M14 3v4h4" stroke="#0f9d8f" stroke-width="1.6"/></svg></div><div><div class="fn">${esc(j.filename)}</div><div class="fs">${j.sheets.length} 个子表 · 读取成功</div></div><button class="linkbtn" id="repick">重新选择</button></div>`;
     $("repick").onclick=()=>fileInput.click();
-    $("sheetWrap").style.display="block";renderSheets();
+    $("sheetWrap").style.display="block";renderSheets();updateIntro();
   }catch(e){$("dropBig").textContent=e.message+"（点击重试）";S.data=null}
 }
 function pickedSheets(){return S.data?S.data.sheets.filter(s=>S.sheets.includes(s.name)):[]}
@@ -1213,6 +1270,15 @@ $("tplDel").onclick=delTpl;
 loadTpls();
 renderNav();goStep(1);
 </script>
+<!-- 预约演示弹窗 -->
+<div class="modal-mask" id="demoModal">
+  <div class="modal">
+    <div class="modal-head"><h3>预约演示</h3><span class="close" onclick="hideModal('demoModal')">×</span></div>
+    <div class="modal-body" id="demoBody"></div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="hideModal('demoModal')">关闭</button></div>
+  </div>
+</div>
+
 <!-- 新增数据源弹窗 -->
 <div class="modal-mask" id="addModal">
   <div class="modal">

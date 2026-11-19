@@ -87,6 +87,7 @@
     if(cfg && cfg.navId){
       $(cfg.navId)?.classList.add("active");
     }
+    if(typeof updateIntro === "function") updateIntro();
   };
   window.goSources = function(){ goModule("sources"); };
 

@@ -316,6 +316,10 @@ excel-splitter/
 - [x] 清洗 / 计算 / 运行历史 接口失败时显示可见错误态与「重试」
 - [x] 清洗 / 计算 配置区与预览区窄屏上下排列（视口 ≤1180px）
 - [x] 浏览器标签页图标（内联 SVG，消除 `/favicon.ico` 404）
+- [x] 首屏访客态：价值主张 + 使用流程 + 「预约演示」主按钮 + 「直接上传文件」次按钮
+- [x] 配置模板栏默认收起，点「用模板快速开始」展开，避免抢上传区主操作
+- [x] 视觉刻度统一：字号 12/14/16/20/24、间距 4/8/12/16/24/32/40、圆角 6/8/12/16；
+      侧栏与 logo 去掉背景渐变，侧栏 6 个 emoji 换成统一线性 SVG
 
 #### 布局实现要点（改动前必看）
 - **面板动画不能依赖 opacity**：`.panel.show` 的 `@keyframes fade` 只做 `translateY` 位移。
@@ -333,6 +337,11 @@ excel-splitter/
   列表模块统一 `renderLoadError()`，不要只留一块空白。
 - **模板改动需要重启服务**：Flask 非 debug 模式下 Jinja 缓存模板，改 `templates/*.html`
   后必须重启 `app.py` 才生效；`static/*` 刷新页面即可。
+- **首屏与操作态互斥**：`updateIntro()` 按 `S.step===1 && !S.data && currentModule==='distribute'`
+  决定显示首屏介绍、并隐藏顶部 STEP 栏。`goStep()` 末尾、`upload()` 成功后都要调用；
+  `goModule()`（`static/sources.js`）切换模块时也要调用，否则首屏会压在其他模块上方。
+- **预约演示是占位入口**：`templates/index.html` 里的 `DEMO_CONTACT` 留空时，弹窗只显示接入说明；
+  填入邮箱 / 企微 / 表单链接后按钮直接跳转。没有真实渠道前不要补写联系方式或数字。
 
 ### 5.8 全表脱敏 🟢
 
